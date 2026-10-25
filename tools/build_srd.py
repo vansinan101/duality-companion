@@ -12,6 +12,7 @@ then cross-checked against an independent full-text copy by tools/check_srd.py.
 import json, os, re, sys
 
 SRC, OUT = sys.argv[1], sys.argv[2]
+CORE = sys.argv[3] if len(sys.argv) > 3 else None   # SRD 1.0 JSON folder (= the Core Set); anything not in it is Hope & Fear content
 problems = []
 
 def read(path):
@@ -286,6 +287,25 @@ data = {
 }
 for x in weapons + armor:
     if x["feat"].strip() in ("—", "-", "–"): x["feat"] = ""
+# Mark Hope & Fear expansion content (hf: 1) by comparing names with SRD 1.0, which holds only the Core Set.
+if CORE:
+    import unicodedata
+    k = lambda s: re.sub(r"[^a-z0-9]", "", unicodedata.normalize("NFKD", s).replace("’", "'").lower())
+    pairs = {"classes": classes, "subclasses": subclasses, "ancestries": ancestries, "communities": communities, "abilities": cards,
+             "weapons": weapons, "armor": armor, "items": items, "consumables": consumables, "adversaries": adversaries,
+             "environments": environments, "beastforms": beastforms}
+    tagged = {}
+    for f, lst in pairs.items():
+        with open(os.path.join(CORE, f + ".json"), encoding="utf-8-sig") as fh: core = {k(x["name"]) for x in json.load(fh)}
+        for x in lst:
+            if k(x["name"]) not in core and not x.get("wheelchair"): x["hf"] = 1
+        tagged[f] = sum(1 for x in lst if x.get("hf"))
+    for x in transformations: x["hf"] = 1
+    for x in domains:
+        if x["name"] == "Dread": x["hf"] = 1
+    print("Hope & Fear entries:", json.dumps(tagged))
+else:
+    problems.append("no SRD 1.0 folder given: Hope & Fear content is not tagged")
 counts = {k: len(v) for k, v in data.items() if isinstance(v, list)}
 print(json.dumps(counts))
 for p in problems: print("PROBLEM:", p)
