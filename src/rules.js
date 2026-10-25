@@ -71,8 +71,8 @@
       marks: { hp: 0, stress: 0, hope: 2, armor: {} },   // armor: { armorId: slots marked }
       scars: 0,
       cards: [],                         // [{ name, where: "loadout" | "vault" }]
-      weapons: [],                       // [{ id, name, custom?, slot: "primary" | "secondary" | "pack" }]
-      armor: [],                         // [{ id, name, custom?, worn }]
+      weapons: [],                       // [{ id, name, label?, custom?, slot: "primary" | "secondary" | "pack" }]; label = the player's own name for it
+      armor: [],                         // [{ id, name, label?, custom?, worn }]
       items: [],                         // [{ id, name, qty, kind: "item" | "consumable", text }]
       gold: { coins: 0, handfuls: 1, bags: 0, chests: 0 },
       conditions: [],
@@ -99,6 +99,7 @@
     c.gold = Object.assign({}, b.gold, c.gold);
     ["experiences", "levelups", "cards", "weapons", "armor", "items", "conditions", "log"].forEach(k => { if (!Array.isArray(c[k])) c[k] = []; });
     ["uses", "tokens", "answers"].forEach(k => { if (!c[k] || typeof c[k] !== "object") c[k] = {}; });
+    c.weapons.concat(c.armor).forEach(g => { if (g && g.label != null && typeof g.label !== "string") g.label = String(g.label); });
     c.level = clamp(num(c.level, 1), 1, 10);
     c.experiences = c.experiences.map((e, i) => Object.assign({ id: "e" + i, name: "", base: 2 }, e));
     return c;
@@ -157,6 +158,8 @@
   const worn = c => (c.armor || []).find(a => a.worn) || null;
   const armorStats = a => (!a ? null : a.custom ? { name: a.name || "Armor", major: num(a.major), severe: num(a.severe), score: num(a.score), feat: a.feat || "" } : armorItem(a.name));
   const weaponStats = w => (!w ? null : w.custom ? { name: w.name || "Weapon", trait: w.trait || "Strength", range: w.range || "Melee", dmg: w.dmg || "d6 phy", burden: w.burden || "One-Handed", cat: w.slot === "secondary" ? "Secondary" : "Primary", feat: w.feat || "", tier: num(w.tier, 1) } : weapon(w.name));
+  // What to call a weapon or armor: the player's own name if they gave one, else the item's.
+  const gearName = (g, S) => (g && typeof g.label === "string" && g.label.trim()) || (S && S.name) || (g && g.name) || "";
   const equipped = c => (c.weapons || []).filter(w => w.slot === "primary" || w.slot === "secondary");
 
   // ---- the derived sheet ----
@@ -346,7 +349,7 @@
     tierOf, clamp, num, sign, blankCharacter, heritageFeatures, HERITAGE_MODS, normalize, derived, advCounts, markedTraits, subclassTier, proficiency,
     featureMods, severity, duality, roll, die, damageExpr, usage, refreshUses, goldTotal, goldFrom,
     availableCards, advancementOptions, levelUp, undoLevelUp,
-    cls, subcls, subclassesOf, cardsIn, card, weapon, armorItem, armorStats, weaponStats, worn, equipped, byName,
+    cls, subcls, subclassesOf, cardsIn, card, weapon, armorItem, armorStats, weaponStats, gearName, worn, equipped, byName,
   };
   root.DH = api;
   if (typeof module !== "undefined") module.exports = api;

@@ -23,7 +23,7 @@ function GMView({ chars, all, updateChar, openChar, openBooks }) {
       </div>
     </div>
     <${Head} title="The party" topic="gmparty" icon="crown" />
-    <div class="party">${party.map(c => html`<${PartyCard} c=${norm(c)} updateChar=${updateChar} openChar=${openChar} frame=${st.frame} spot=${st.spotlight} />`)}
+    <div class="party">${party.map(c => html`<${PartyCard} key=${c.id} c=${norm(c)} updateChar=${updateChar} openChar=${openChar} frame=${st.frame} spot=${st.spotlight} />`)}
       ${!party.length && html`<p class="muted">No characters here yet.</p>`}</div>
     <${Spotlight} party=${party} st=${st} save=${save} />
     <${Foes} st=${st} save=${save} />
@@ -97,7 +97,7 @@ function Foes({ st, save }) {
         <div class="statcells"><div class="cell big"><small>Difficulty</small><b>${a.diff}</b></div><div class="cell"><small>Thresholds</small><b>${a.thresholds}</b></div><div class="cell big"><small>HP</small><b>${a.hp}</b></div><div class="cell"><small>Stress</small><b>${a.stress ?? "—"}</b></div></div>
         <span class="row"><button class="btn tiny primary" onClick=${() => addFoe(a)}>Add</button><button class="btn tiny" onClick=${() => addFoe(a, 3)}>Add 3</button>
           <button class="btn tiny" onClick=${() => openPanel({ title: a.name, sub: `Tier ${a.tier} ${a.type}`, body: html`<${StatBlock} a=${a} />` })}>Stat block</button></span></div>`} />`}
-    <div class="foes">${foes.map(f => html`<${FoeCard} f=${f} setFoe=${setFoe} save=${save} />`)}</div>
+    <div class="foes">${foes.map(f => html`<${FoeCard} key=${f.id} f=${f} setFoe=${setFoe} save=${save} />`)}</div>
     ${!foes.length && html`<p class="muted small">No adversaries in the scene.</p>`}
     ${foes.length > 0 && html`<div class="row"><button class="btn small danger" onClick=${() => confirm("Clear every adversary from the scene?") && save(s => { s.foes = []; })}>Clear the scene</button></div>`}
     <${Head} level=${3} title="Environment" />

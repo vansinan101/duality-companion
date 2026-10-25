@@ -59,7 +59,7 @@ function Genesis({ onClose, onDone }) {
       <button class="iconbtn" aria-label="Close" onClick=${onClose}>×</button></div>
     <ol class="g-rail">${G_STEPS.map((n, i) => html`<li class=${okStep(i) ? "done" : ""}><button class=${(i === g.step ? "on " : "") + (okStep(i) ? "ok" : "")} onClick=${() => go(i)} aria-label=${`Step ${i + 1}: ${n}`}>
       <span class="gem"><span>${okStep(i) && i !== g.step ? "✓" : i + 1}</span></span><span class="lbl">${n}</span></button></li>`)}</ol>
-    <div class="g-body"><${Step} g=${g} set=${set} K=${K} sub=${sub} spellcaster=${spellcaster} pool=${pool} tapVal=${tapVal} setTapVal=${setTapVal} P=${P} /></div>
+    <div class="g-body"><div class="g-step" key=${g.step}><${Step} g=${g} set=${set} K=${K} sub=${sub} spellcaster=${spellcaster} pool=${pool} tapVal=${tapVal} setTapVal=${setTapVal} P=${P} /></div></div>
     <button class="g-arrow prev" disabled=${g.step === 0} onClick=${() => go(g.step - 1)} aria-label="Previous step"><span class="orb">❮</span><span class="al">${g.step > 0 ? G_STEPS[g.step - 1] : "Back"}</span></button>
     ${last ? html`<button class="g-arrow next finish" disabled=${firstGap >= 0} title=${firstGap >= 0 ? `Finish step ${firstGap + 1}: ${G_STEPS[firstGap]}` : ""} onClick=${finish} aria-label="Begin the adventure"><span class="orb">✦</span><span class="al">${firstGap >= 0 ? `Finish ${G_STEPS[firstGap]}` : "Begin the adventure"}</span></button>`
       : html`<button class="g-arrow next" onClick=${() => go(g.step + 1)} aria-label="Next step"><span class="orb">❯</span><span class="al">${G_STEPS[g.step + 1]}</span></button>`}
