@@ -63,7 +63,7 @@ function LevelUp({ c, d, update, onClose }) {
           ${p.k === "evasion" && html`<p class="small">Evasion ${d.evasion} → ${d.evasion + 1}</p>`}
           ${p.k === "prof" && html`<p class="small">Proficiency rises by 1 (on top of any tier achievement).</p>`}
           ${p.k === "multi" && html`<div class="grid4">
-            <${Select} label="Class" value=${p.multi.cls} empty="—" options=${SRD.classes.filter(k => k.name !== c.cls).map(k => k.name)} onChange=${v => setPick(i, x => { x.multi = { cls: v, domain: "", sub: "" }; return x; })} />
+            <${Select} label="Class" value=${p.multi.cls} empty="—" options=${R.list("classes").filter(k => k.name !== c.cls).map(k => k.name)} onChange=${v => setPick(i, x => { x.multi = { cls: v, domain: "", sub: "" }; return x; })} />
             <${Select} label="Domain" value=${p.multi.domain} empty="—" options=${(R.byName("classes", p.multi.cls) || { domains: [] }).domains} onChange=${v => setPick(i, x => { x.multi.domain = v; return x; })} />
             <${Select} label="Subclass (foundation)" value=${p.multi.sub} empty="—" options=${R.subclassesOf(p.multi.cls).map(s => s.name)} onChange=${v => setPick(i, x => { x.multi.sub = v; return x; })} /></div>
             <p class="muted small">You gain that class's features and the foundation card. Later cards from its domain can be at most half your level.</p>`}

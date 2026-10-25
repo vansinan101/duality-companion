@@ -39,12 +39,19 @@
   ];
   const ADV_BY = Object.fromEntries(ADV.map(a => [a.k, a]));
 
+  // ---- which rulebooks the table uses: the Core Set always; Hope & Fear expansion content (hf: 1) only if the GM says so ----
+  let BOOKS = { hf: false };
+  const setBooks = b => { BOOKS = Object.assign({ hf: false }, b || {}); };
+  const allowed = x => !!x && (!x.hf || BOOKS.hf);
+  const books = () => BOOKS;
+
   // ---- data lookups ----
   const byName = (list, n) => (S()[list] || []).find(x => x.name === n) || null;
   const cls = c => byName("classes", c.cls);
   const subcls = (name) => byName("subclasses", name);
-  const subclassesOf = clsName => (S().subclasses || []).filter(s => s.cls === clsName);
-  const cardsIn = dom => (S().cards || []).filter(x => x.dom === dom).sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
+  const subclassesOf = clsName => (S().subclasses || []).filter(s => s.cls === clsName && allowed(s));
+  const cardsIn = dom => (S().cards || []).filter(x => x.dom === dom && allowed(x)).sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
+  const list = kind => (S()[kind] || []).filter(allowed);
   const card = n => byName("cards", n);
   const weapon = n => byName("weapons", n);
   const armorItem = n => byName("armor", n);
@@ -335,6 +342,7 @@
 
   const api = {
     TRAITS, TRAIT_KEY, TRAIT_NAME, START_TRAITS, MAX, RANGES, ADV, ADV_BY, SHORT_MOVES, LONG_MOVES,
+    setBooks, allowed, books, list,
     tierOf, clamp, num, sign, blankCharacter, heritageFeatures, HERITAGE_MODS, normalize, derived, advCounts, markedTraits, subclassTier, proficiency,
     featureMods, severity, duality, roll, die, damageExpr, usage, refreshUses, goldTotal, goldFrom,
     availableCards, advancementOptions, levelUp, undoLevelUp,

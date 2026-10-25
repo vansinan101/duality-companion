@@ -43,4 +43,7 @@ eq(DH.usage("You can do this three times per rest").times, 3, "three times per r
 // card counts
 eq(DH.cardsIn("Blade").filter(x => x.lvl === 1).length, 3, "Blade has three level 1 cards");
 eq(SRD.classes.length, 13, "13 classes"); eq(SRD.cards.length, 210, "210 domain cards");
+// rulebooks: Core only hides Hope & Fear content
+DH.setBooks({ hf: false }); eq([DH.list("classes").length, DH.subclassesOf("Witch").length, DH.cardsIn("Dread").length], [9, 0, 0], "Core only: 9 classes, no Witch subclasses, no Dread cards");
+DH.setBooks({ hf: true }); eq([DH.list("classes").length, DH.cardsIn("Dread").length], [13, 21], "With Hope & Fear: 13 classes and the Dread domain");
 console.log(fails ? `${fails} FAILED` : "all passed"); process.exit(fails ? 1 : 0);

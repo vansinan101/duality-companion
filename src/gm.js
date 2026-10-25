@@ -1,7 +1,7 @@
 /* ================= GM table ================= */
 // Fear, the party at a glance, adversaries in the scene, countdowns, the optional spotlight tracker,
 // the Witherwild's Wither tokens (when the table turns that frame on), players and roles, and backups.
-function GMView({ chars, all, updateChar, openChar }) {
+function GMView({ chars, all, updateChar, openChar, openBooks }) {
   const st = Store.state;
   const save = fn => Store.saveState(fn);
   const pcs = chars.filter(c => c.kind !== "companion");
@@ -11,17 +11,18 @@ function GMView({ chars, all, updateChar, openChar }) {
   const camps = [...new Set(pcs.map(c => c.campaign || "").filter(Boolean))];
   return html`<section class="gm">
     <div class="gmtop card">
-      <div class="fear"><span class="tl">Fear</span><${Track} label="Fear" value=${num(st.fear)} max=${R.MAX.fear} kind="fear" verb=${["Gain", "Spend"]} onSet=${v => save(s => { s.fear = v; })} />
+      <div class="fear"><span class="tl"><${Icon} n="fear" />Fear</span><${Track} label="Fear" value=${num(st.fear)} max=${R.MAX.fear} kind="fear" verb=${["Gain", "Spend"]} onSet=${v => save(s => { s.fear = v; })} />
         <span class="row"><button class="btn tiny" onClick=${async () => { const r = await rollExpr("Short rest Fear", "1d4"); if (r != null) Store.addFear(r); }}>Short rest +1d4</button>
           <button class="btn tiny" onClick=${async () => { const r = await rollExpr("Long rest Fear", "1d4"); if (r != null) Store.addFear(r + party.length); }}>Long rest +1d4+${party.length}</button></span></div>
       <div class="row wrapr">
         ${camps.length > 0 && html`<${Select} label="Campaign" value=${camp} empty="All" options=${camps} onChange=${setCamp} />`}
         <label class="chk small"><input type="checkbox" checked=${!!(st.options || {}).massive} onChange=${e => save(s => { s.options = Object.assign({}, s.options, { massive: e.target.checked }); })} /> Optional rule: Massive Damage</label>
         <label class="chk small"><input type="checkbox" checked=${st.frame === "witherwild"} onChange=${e => save(s => { s.frame = e.target.checked ? "witherwild" : ""; })} /> Campaign frame: The Witherwild</label>
+        <button class="btn small" onClick=${openBooks}><${Icon} n="book" />Rulebooks: Core${R.books().hf ? " + Hope & Fear" : " only"}</button>
         <button class="btn small" onClick=${() => endSession(party, updateChar)}>End session</button>
       </div>
     </div>
-    <${Head} title="The party" topic="gmparty" />
+    <${Head} title="The party" topic="gmparty" icon="crown" />
     <div class="party">${party.map(c => html`<${PartyCard} c=${norm(c)} updateChar=${updateChar} openChar=${openChar} frame=${st.frame} spot=${st.spotlight} />`)}
       ${!party.length && html`<p class="muted">No characters here yet.</p>`}</div>
     <${Spotlight} party=${party} st=${st} save=${save} />
@@ -70,7 +71,7 @@ function Spotlight({ party, st, save }) {
   const left = c => (sp.left[c.id] == null ? sp.per : sp.left[c.id]);
   const allOut = party.length && party.every(c => left(c) <= 0);
   return html`<section class="card">
-    <${Head} title="Spotlight tracker" topic="spotlight" tail=${html`<label class="chk small"><input type="checkbox" checked=${sp.on} onChange=${e => save(s => { s.spotlight = Object.assign({}, sp, { on: e.target.checked }); })} /> Use it</label>`} />
+    <${Head} title="Spotlight tracker" topic="spotlight" icon="spotlight" tail=${html`<label class="chk small"><input type="checkbox" checked=${sp.on} onChange=${e => save(s => { s.spotlight = Object.assign({}, sp, { on: e.target.checked }); })} /> Use it</label>`} />
     ${sp.on ? html`<div class="spots">${party.map(c => html`<div class="spot"><span>${c.name || "Unnamed"}</span>
         <${Track} label=${`${c.name} spotlight tokens`} value=${left(c)} max=${sp.per} kind="spot" verb=${["Give back", "Spend"]} onSet=${v => save(s => { s.spotlight = Object.assign({}, sp, { left: Object.assign({}, sp.left, { [c.id]: v }) }); })} /></div>`)}</div>
       <div class="row">${allOut && html`<span class="warn">Everyone has used their tokens.</span>`}<button class="btn small" onClick=${() => save(s => { s.spotlight = Object.assign({}, sp, { left: {} }); })}>Refill all</button>
@@ -83,22 +84,24 @@ function Foes({ st, save }) {
   const [q, setQ] = useState(""); const [tier, setTier] = useState(0); const [show, setShow] = useState(false);
   const foes = st.foes || [];
   const needle = q.trim().toLowerCase();
-  const found = show ? SRD.adversaries.filter(a => (!tier || a.tier === tier) && (!needle || a.name.toLowerCase().includes(needle) || a.type.toLowerCase().includes(needle))).slice(0, 60) : [];
+  const found = show ? R.list("adversaries").filter(a => (!tier || a.tier === tier) && (!needle || a.name.toLowerCase().includes(needle) || a.type.toLowerCase().includes(needle))) : [];
   const addFoe = (a, n = 1) => save(s => { s.foes = (s.foes || []).concat(Array.from({ length: n }, (_, i) => ({ id: rid("f"), src: a ? a.name : "", name: a ? a.name + (n > 1 ? ` ${i + 1}` : "") : "Adversary", hp: 0, stress: 0, hpMax: a ? a.hp : 6, stressMax: a ? num(a.stress) : 3, diff: a ? a.diff : 12, thr: a ? a.thresholds : "8/15", note: "" }))); });
   const setFoe = (id, fn) => save(s => { s.foes = s.foes.map(f => (f.id === id ? Object.assign({}, f, fn(f)) : f)); });
   const env = st.env ? R.byName("environments", st.env) : null;
   return html`<section class="card">
-    <${Head} title="Adversaries" topic="adversaries" tail=${html`<span class="row"><button class="btn small" onClick=${() => setShow(!show)}>${show ? "Hide list" : "+ From the SRD"}</button><button class="btn small" onClick=${() => addFoe(null)}>+ Custom</button></span>`} />
-    ${show && html`<div class="row wrapr"><input type="search" placeholder="Find an adversary or type" value=${q} onInput=${e => setQ(e.target.value)} aria-label="Find an adversary" />
-      <div class="seg small">${[0, 1, 2, 3, 4].map(t => html`<button aria-pressed=${tier === t} onClick=${() => setTier(t)}>${t ? "Tier " + t : "All"}</button>`)}</div></div>
-      <div class="plist short">${found.map(a => html`<div class="prow"><b>${a.name}</b><span>Tier ${a.tier} ${a.type}${a.horde ? ` (${a.horde}/HP)` : ""} · Difficulty ${a.diff} · ${a.thresholds} · HP ${a.hp} · Stress ${a.stress ?? "—"}</span>
-        <span class="row"><button class="btn tiny" onClick=${() => addFoe(a)}>Add</button><button class="btn tiny" onClick=${() => addFoe(a, 3)}>Add 3</button>
-          <button class="btn tiny" onClick=${() => openPanel({ title: a.name, sub: `Tier ${a.tier} ${a.type}`, body: html`<${StatBlock} a=${a} />` })}>Stat block</button></span></div>`)}</div>`}
+    <${Head} title="Adversaries" topic="adversaries" icon="foe" tail=${html`<span class="row"><button class="btn small" onClick=${() => setShow(!show)}>${show ? "Hide list" : "+ From the SRD"}</button><button class="btn small" onClick=${() => addFoe(null)}>+ Custom</button></span>`} />
+    ${show && html`<${Catalog} title="Bestiary" icon="foe" items=${found} resetKey=${needle + tier}
+      tools=${html`<input type="search" placeholder="Find an adversary or type" value=${q} onInput=${e => setQ(e.target.value)} aria-label="Find an adversary" />
+        <div class="seg small">${[0, 1, 2, 3, 4].map(t => html`<button aria-pressed=${tier === t} onClick=${() => setTier(t)}>${t ? "Tier " + t : "All"}</button>`)}</div>`}
+      render=${a => html`<div class="item-card"><span class="in"><${Icon} n="foe" />${a.name}</span><span class="small muted">Tier ${a.tier} ${a.type}${a.horde ? ` (${a.horde}/HP)` : ""}</span>
+        <div class="statcells"><div class="cell big"><small>Difficulty</small><b>${a.diff}</b></div><div class="cell"><small>Thresholds</small><b>${a.thresholds}</b></div><div class="cell big"><small>HP</small><b>${a.hp}</b></div><div class="cell"><small>Stress</small><b>${a.stress ?? "—"}</b></div></div>
+        <span class="row"><button class="btn tiny primary" onClick=${() => addFoe(a)}>Add</button><button class="btn tiny" onClick=${() => addFoe(a, 3)}>Add 3</button>
+          <button class="btn tiny" onClick=${() => openPanel({ title: a.name, sub: `Tier ${a.tier} ${a.type}`, body: html`<${StatBlock} a=${a} />` })}>Stat block</button></span></div>`} />`}
     <div class="foes">${foes.map(f => html`<${FoeCard} f=${f} setFoe=${setFoe} save=${save} />`)}</div>
     ${!foes.length && html`<p class="muted small">No adversaries in the scene.</p>`}
     ${foes.length > 0 && html`<div class="row"><button class="btn small danger" onClick=${() => confirm("Clear every adversary from the scene?") && save(s => { s.foes = []; })}>Clear the scene</button></div>`}
     <${Head} level=${3} title="Environment" />
-    <div class="row wrapr"><${Select} label="Environment" value=${st.env} empty="None" options=${[1, 2, 3, 4].map(t => ({ group: "Tier " + t, items: SRD.environments.filter(e => e.tier === t).map(e => [e.name, `${e.name} (${e.type})`]) }))} onChange=${v => save(s => { s.env = v; })} /></div>
+    <div class="row wrapr"><${Select} label="Environment" value=${st.env} empty="None" options=${[1, 2, 3, 4].map(t => ({ group: "Tier " + t, items: R.list("environments").filter(e => e.tier === t).map(e => [e.name, `${e.name} (${e.type})`]) }))} onChange=${v => save(s => { s.env = v; })} /></div>
     ${env && html`<div class="statblock"><p><i>${env.desc}</i></p><p class="small"><b>Impulses:</b> ${env.impulses} · <b>Difficulty:</b> ${env.diff}${env.potential ? html` · <b>Potential adversaries:</b> ${env.potential}` : ""}</p>
       ${env.features.map(f => html`<div class="feat"><div class="fhead"><b>${f.n}</b></div><${Md} text=${f.x} /></div>`)}</div>`}
   </section>`;
@@ -135,7 +138,7 @@ function Countdowns({ st, save }) {
   const cds = st.countdowns || [];
   const setCd = (id, fn) => save(s => { s.countdowns = s.countdowns.map(x => (x.id === id ? Object.assign({}, x, fn(x)) : x)); });
   return html`<section class="card">
-    <${Head} title="Countdowns" topic="countdowns" tail=${html`<button class="btn small" onClick=${() => save(s => { s.countdowns = (s.countdowns || []).concat({ id: rid("k"), name: "Countdown", start: 4, value: 4, loop: false }); })}>+ Countdown</button>`} />
+    <${Head} title="Countdowns" topic="countdowns" icon="countdown" tail=${html`<button class="btn small" onClick=${() => save(s => { s.countdowns = (s.countdowns || []).concat({ id: rid("k"), name: "Countdown", start: 4, value: 4, loop: false }); })}>+ Countdown</button>`} />
     <div class="cds">${cds.map(k => html`<div class=${"cd" + (num(k.value) <= 0 ? " fired" : "")}>
       <input value=${k.name} aria-label="Countdown name" onInput=${e => setCd(k.id, () => ({ name: e.target.value }))} />
       <b class="cdv">${k.value}</b>
@@ -150,7 +153,7 @@ function Countdowns({ st, save }) {
 function Players({ chars, updateChar }) {
   const ms = Store.members || [];
   const mine = uid => chars.filter(c => playersOf(c).includes(uid) && !c.companionOf);
-  return html`<section class="card"><${Head} title="Players at the table" />
+  return html`<section class="card"><${Head} title="Players at the table" icon="community" />
     <div class="members">${ms.map(m => html`<div class="member"><b>${m.name}</b><span class="tag">${m.role === "gm" ? "GM" : "Player"}</span>
       <span class="small muted">${mine(m.uid).map(c => c.name).join(", ") || "No characters"}</span>
       ${m.uid !== Store.table.uid && html`<span class="row"><button class="btn tiny" onClick=${() => Store.table.setRole(m.uid, m.role === "gm" ? "player" : "gm")}>${m.role === "gm" ? "Make player" : "Make GM"}</button>
@@ -175,7 +178,7 @@ function Backup({ chars }) {
       toast("Backup restored.");
     } catch { toast("That isn't a table backup."); }
   };
-  return html`<section class="card"><${Head} title="Table backup" />
+  return html`<section class="card"><${Head} title="Table backup" icon="book" />
     <div class="row"><button class="btn" onClick=${make}>Download a backup</button>
       <label class="btn">Restore a backup<input type="file" accept=".json" hidden onChange=${e => e.target.files[0] && restore(e.target.files[0])} /></label></div>
     <p class="muted small">Every character, portrait and the table's Fear, countdowns and scene in one file.</p></section>`;
