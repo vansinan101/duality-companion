@@ -1,0 +1,42 @@
+# Publishes the site whenever main or Dev changes:
+#   main -> the live site at the root        Dev -> the test site at /dev/ (red DEV ribbon)
+# Both are built from src/ and pushed to the gh-pages branch, which GitHub Pages serves.
+# Never edit gh-pages by hand: it is rebuilt from scratch on every run.
+name: Publish site
+on:
+  push:
+    branches: [main, Dev]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: publish
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, path: main }
+      - uses: actions/checkout@v4
+        with: { ref: Dev, path: dev }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Build main and Dev
+        run: |
+          python3 main/src/build.py --web out
+          cp main/firebase-config.js out/firebase-config.js
+          python3 dev/src/build.py --web out/dev --dev
+          cp dev/firebase-config.js out/dev/firebase-config.js
+          printf 'User-agent: *\nDisallow: /\n' > out/robots.txt
+          touch out/.nojekyll
+          ls -la out out/dev
+      - name: Push to gh-pages
+        run: |
+          cd out
+          git init -q -b gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Publish: ${GITHUB_REF_NAME} ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" gh-pages

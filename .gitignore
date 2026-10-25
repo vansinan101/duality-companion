@@ -1,0 +1,11 @@
+# Built output: the publish workflow builds the site from src/ every time, so nothing built is committed.
+/dist/
+/site/
+/_site/
+/index.html
+sw.js
+*.zip
+__pycache__/
+*.pyc
+/shots/
+.DS_Store

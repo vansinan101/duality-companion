@@ -1,0 +1,44 @@
+rules_version = '2';
+// Duality Companion: who may read and write what. Paste this into Firebase → Firestore → Rules → Publish.
+// tables/<key> where <key> is a hash of the table password. Nobody can list tables, so the password is the way in.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(t) { return signedIn() && exists(/databases/$(db)/documents/tables/$(t)/members/$(request.auth.uid)); }
+    function gm(t) { return member(t) && get(/databases/$(db)/documents/tables/$(t)/members/$(request.auth.uid)).data.role == "gm"; }
+    function onlyChanges(keys) { return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys); }
+
+    // Which table each account belongs to, so signing in on another device finds it.
+    match /users/{uid} { allow read, write: if signedIn() && request.auth.uid == uid; }
+
+    match /tables/{t} {
+      // Anyone signed in may check a table exists (they had to know its password) and create a new one as its owner.
+      match /meta/table {
+        allow get: if signedIn();
+        allow create: if signedIn() && request.resource.data.owner == request.auth.uid;
+        allow update: if gm(t);
+      }
+      match /members/{uid} {
+        allow read: if member(t) && (uid == request.auth.uid || gm(t));
+        allow list: if gm(t);
+        // Joining: you add yourself as a player, or as GM only if you own the table.
+        allow create: if signedIn() && uid == request.auth.uid && (request.resource.data.role == "player"
+          || (request.resource.data.role == "gm" && get(/databases/$(db)/documents/tables/$(t)/meta/table).data.owner == request.auth.uid));
+        allow update: if gm(t) || (uid == request.auth.uid && onlyChanges(["name"]));
+        allow delete: if gm(t);
+      }
+      match /characters/{id} {
+        // GMs see everything; players see the characters assigned to them.
+        allow read: if gm(t) || (member(t) && request.auth.uid in resource.data.get("players", []));
+        allow create: if gm(t) || (member(t) && request.resource.data.players == [request.auth.uid] && request.resource.data.get("freeEdit", false) == false);
+        allow update: if gm(t) || (member(t) && request.auth.uid in resource.data.get("players", [])
+          && request.resource.data.get("players", []) == resource.data.get("players", [])
+          && request.resource.data.get("freeEdit", false) == resource.data.get("freeEdit", false));
+        allow delete: if gm(t) || (member(t) && request.auth.uid in resource.data.get("players", []));
+      }
+      // The table's shared state: Fear, countdowns, the scene. Everyone reads it; rolls with Fear add to it.
+      match /state/{doc} { allow read, write: if member(t); }
+      match /portraits/{id} { allow read, write: if member(t); }
+    }
+  }
+}

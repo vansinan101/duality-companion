@@ -1,0 +1,35 @@
+# The automatic check every pull request must pass before it can merge (the ruleset requires the job "check").
+name: Checks
+on:
+  pull_request:
+  push:
+    branches-ignore: [gh-pages]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Repository rules (no built files, licence wording, settings file)
+        run: python3 tests/check_repo.py
+      - name: Every script parses
+        run: for f in src/*.js; do node --check "$f" || exit 1; done
+      - name: Rules engine against the SRD's own examples
+        run: node tests/t_rules.js
+      - name: Both builds work
+        run: |
+          python3 src/build.py
+          python3 src/build.py --web _site --dev
+      - name: Browser walk-through (desktop and phone)
+        run: |
+          pip install playwright==1.63.0
+          python -m playwright install --with-deps chromium
+          python3 tests/journey.py dist/duality-companion.html shots 1280
+          python3 tests/journey.py dist/duality-companion.html shots 390
+      - name: Keep the screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with: { name: screenshots, path: shots, if-no-files-found: ignore }
