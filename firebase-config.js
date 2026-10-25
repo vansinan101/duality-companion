@@ -1,10 +1,10 @@
-/* Your Firebase web-app settings (Firebase console → Project settings → Your apps → the </> web app).
-   Leave apiKey empty and the site runs in this-browser-only mode. Never commit the template over the real file. */
+/* Firebase web-app settings for the Duality Companion (project duality-companion).
+   These say where the database lives; firestore.rules decides who may read and write. Not secret. */
 window.DUALITY_FIREBASE = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: "",
+  apiKey: "AIzaSyABkxSUwdMvosdfIUmDT17y3--mdIoNVLk",
+  authDomain: "duality-companion.firebaseapp.com",
+  projectId: "duality-companion",
+  storageBucket: "duality-companion.firebasestorage.app",
+  messagingSenderId: "853068669646",
+  appId: "1:853068669646:web:730f054a306d8d3335a69f",
 };
