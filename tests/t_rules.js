@@ -46,4 +46,8 @@ eq(SRD.classes.length, 13, "13 classes"); eq(SRD.cards.length, 210, "210 domain 
 // rulebooks: Core only hides Hope & Fear content
 DH.setBooks({ hf: false }); eq([DH.list("classes").length, DH.subclassesOf("Witch").length, DH.cardsIn("Dread").length], [9, 0, 0], "Core only: 9 classes, no Witch subclasses, no Dread cards");
 DH.setBooks({ hf: true }); eq([DH.list("classes").length, DH.cardsIn("Dread").length], [13, 21], "With Hope & Fear: 13 classes and the Dread domain");
+// renamed gear: the player's name wins, the item's stays for its type; older saves without a label still work
+const gn = DH.normalize({ weapons: [{ id: "w", name: "Broadsword", slot: "primary", label: "Oathkeeper" }, { id: "v", name: "Dagger", slot: "pack", label: 7 }] });
+eq([DH.gearName(gn.weapons[0], DH.weaponStats(gn.weapons[0])), DH.weaponStats(gn.weapons[0]).name, gn.weapons[1].label], ["Oathkeeper", "Broadsword", "7"], "renamed weapon keeps its type");
+eq(DH.gearName({ id: "a", name: "Leather Armor", label: "  " }, DH.armorStats({ name: "Leather Armor" })), "Leather Armor", "blank label falls back to the item name");
 console.log(fails ? `${fails} FAILED` : "all passed"); process.exit(fails ? 1 : 0);

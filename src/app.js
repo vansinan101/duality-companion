@@ -7,7 +7,9 @@ const Icon = ({ n, cls = "" }) => (window.ICONS && ICONS[n] ? html`<svg class=${
 const iconHtml = n => (window.ICONS && ICONS[n] ? `<svg class="ico" viewBox="0 0 512 512" aria-hidden="true"><path d="${ICONS[n]}" fill="currentColor"/></svg>` : "");
 // Hope as a cut gem (drawn for this app), in place of the library's rougher diamond.
 if (window.ICONS) ICONS.hope = "M256 24 448 192 256 488 64 192Z M256 24 192 192h128Z M64 192h384 M192 192l64 296 64-296".replace(/ M64 192h384 M192 192l64 296 64-296/, " M100 192h312l-12 18H112Z M192 192l64 260 64-260h-20l-44 200-44-200Z");
-const BOLT = html`<svg viewBox="0 0 12 16" aria-hidden="true"><path d="M7 0 0 9h5l-1 7 8-10H7z" /></svg>`;
+// The recall bolt (drawn for this app), used on cards, buttons and in the rules alike.
+if (window.ICONS) ICONS.recall = "M288 0 64 288h160l-32 224 256-320H288z";
+const BOLT = html`<${Icon} n="recall" />`;
 const DOMAIN_LOOK = { Arcana: ["#8a62ff", "arcana"], Blade: ["#c8374a", "blade"], Bone: ["#a99f8a", "bone"], Codex: ["#3d82d1", "codex"], Grace: ["#d4569c", "grace"],
   Midnight: ["#4c4fa8", "midnight"], Sage: ["#3f9a5c", "sage"], Splendor: ["#d9a832", "splendor"], Valor: ["#d8742a", "valor"], Dread: ["#8d2fa6", "dread"] };
 const domLook = d => DOMAIN_LOOK[d] || ["#7a4ad6", "spell"];
@@ -94,17 +96,58 @@ function Toaster() {
   toastFn = m => { setMsg(m); clearTimeout(t.current); t.current = setTimeout(() => setMsg(""), 3600); };
   return msg ? html`<div class="toast" role="status">${msg}</div>` : null;
 }
-const tip = { set: () => {}, show(el, body) { this.set({ el, body }); }, hide() { this.set(null); } };
+// Hover cards wait a moment before opening, so they don't fly about as the mouse crosses the page;
+// once one is open, moving to the next shows it at once.
+const tip = {
+  set: () => {}, open: false, el: null, timer: 0,
+  show(el, body, now) {
+    clearTimeout(this.timer); this.el = el;
+    const go = () => { this.open = true; this.set({ el, body }); };
+    if (now || this.open) go(); else this.timer = setTimeout(go, 420);
+  },
+  hide() { clearTimeout(this.timer); this.el = null; this.timer = setTimeout(() => { this.open = false; this.set(null); }, 160); },
+};
+// A rule token's card: GLOSSARY (rules-info.js) by key, e.g. "range:Close", "cond:Asleep", "trait:Agility".
+function gloss(key) {
+  if (!key || typeof GLOSSARY === "undefined") return null;
+  let g = GLOSSARY[key], T = "";
+  if (!g) { const i = key.indexOf(":"); g = GLOSSARY[key.slice(0, i)]; T = key.slice(i + 1); }
+  if (!g) return null;
+  const f = x => x.replace(/\{T\}/g, T);
+  return { rule: 1, title: f(g.t), icon: g.i || R.TRAIT_KEY[T.toLowerCase()] || "spell", arcane: !!g.arcane, md: f(g.x) };
+}
 function HoverCard() {
   const [s, set] = useState(null); tip.set = set;
   if (!s || !s.el || !document.body.contains(s.el)) return null;
-  const r = s.el.getBoundingClientRect();
-  const top = r.top > 120 ? r.top + window.scrollY - 8 : r.bottom + window.scrollY + 8;
-  const left = Math.max(8, Math.min(window.innerWidth - 248, r.left + r.width / 2 - 120));
-  return html`<div class=${"hovercard" + (r.top > 120 ? " above" : "")} style=${`top:${top}px;left:${left}px`} role="tooltip">
-    ${s.body.title && html`<b>${s.body.title}</b>`}${(s.body.lines || []).map(l => html`<div>${l}</div>`)}</div>`;
+  const b = s.body, r = s.el.getBoundingClientRect(), W = Math.min(b.rule ? 310 : 260, window.innerWidth - 16);
+  const above = r.top > (b.rule ? 200 : 120);
+  const top = above ? r.top + window.scrollY - 8 : r.bottom + window.scrollY + 8;
+  const left = Math.max(8, Math.min(window.innerWidth - W - 8, r.left + r.width / 2 - W / 2));
+  return html`<div class=${"hovercard" + (above ? " above" : "") + (b.rule ? " rule" : "")} style=${`top:${top}px;left:${left}px;width:${W}px`} role="tooltip">
+    ${b.rule ? html`<div class="hc-h"><span class=${"hc-medal" + (b.arcane ? " arcane" : "")}><${Icon} n=${b.icon} /></span><b>${b.title}</b></div><${Md} text=${b.md} />`
+      : html`${b.title && html`<b>${b.title}</b>`}${(b.lines || []).map(l => html`<div>${l}</div>`)}`}</div>`;
 }
-const MOUSE_L = "🖱 Left-click", MOUSE_R = "Right-click (long-press on a phone)";
+// Rule tokens inside ability text are plain HTML, so one listener for the whole page opens their cards (hover, or tap on a phone).
+function useTokenCards() {
+  useEffect(() => {
+    const at = e => (e.target && e.target.closest ? e.target.closest("[data-tip]") : null);
+    const over = e => { const t = at(e); if (t && t !== tip.el) { const g = gloss(t.dataset.tip); if (g) tip.show(t, g); } };
+    const out = e => { const t = at(e); if (t && !(e.relatedTarget && t.contains(e.relatedTarget))) tip.hide(); };
+    const tap = e => { const t = at(e); if (t) { const g = gloss(t.dataset.tip); if (g) tip.show(t, g, true); } };
+    const off = () => { if (tip.open || tip.el) tip.hide(); };
+    document.addEventListener("mouseover", over); document.addEventListener("mouseout", out); document.addEventListener("click", tap);
+    window.addEventListener("scroll", off, true);
+    return () => { document.removeEventListener("mouseover", over); document.removeEventListener("mouseout", out); document.removeEventListener("click", tap); window.removeEventListener("scroll", off, true); };
+  }, []);
+}
+// Screen effects: a red flash and a shake when a character is hurt.
+const FX = {
+  hurt() {
+    const b = document.body; b.classList.remove("hurt"); void b.offsetWidth; b.classList.add("hurt");
+    clearTimeout(this.t); this.t = setTimeout(() => b.classList.remove("hurt"), 750);
+  },
+};
+const MOUSE_L = "Left-click", MOUSE_R = "Right-click (long-press on a phone)";
 
 // Left-click / right-click / long-press on one element.
 function pressProps(onLeft, onRight, tipBody) {
@@ -123,19 +166,19 @@ const esc = s => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").re
 // Rule words become tokens with an icon, so costs, dice, ranges and rolls stand out in ability text.
 const TRAITS_RE = "Agility|Strength|Finesse|Instinct|Presence|Knowledge";
 const CONDS = "Vulnerable|Hidden|Restrained|Asleep|Hexed|Distracted|Unstoppable|Poisoned|Stunned|Enraptured|Horrified|Frightened|Dazed|Cloaked";
-const tok = (kind, icon, text) => `<span class="tok tok-${kind}">${iconHtml(icon)}${text}</span>`;
+const tok = (kind, icon, text, key) => `<span class="tok tok-${kind}"${key ? ` data-tip="${key}"` : ""}>${iconHtml(icon)}${text}</span>`;
 function tokens(s) {
   const B = "\\*\\*";
   s = s.replace(new RegExp(B + "((?:spend|spending) (?:a|an|one|two|three|\\d+|any number of|all of your|your)? ?Hope)" + B, "gi"), (_, t) => tok("hope", "hope", t));
-  s = s.replace(new RegExp(B + "((?:spend|spending) (?:a|an|one|two|\\d+|any number of)? ?Fear)" + B, "gi"), (_, t) => tok("fear", "fear", t));
+  s = s.replace(new RegExp(B + "((?:spend|spending) (?:a|an|one|two|\\d+|any number of)? ?Fear)" + B, "gi"), (_, t) => tok("fear", "fear", t, "fear"));
   s = s.replace(new RegExp(B + "((?:mark|marking) (?:a|an|one|two|three|\\d+|any number of|your last|their last)? ?Stress)" + B, "gi"), (_, t) => tok("stress", "stress", t));
   s = s.replace(new RegExp(B + "((?:mark|marking|clear|clears) (?:a|an|one|two|\\d+|any number of|your last|all)? ?Hit Points?)" + B, "gi"), (_, t) => tok("hp", "heart", t));
-  s = s.replace(new RegExp(B + "((?:mark|marking|clear) (?:a|an|one|two|\\d+|any number of|your last)? ?Armor Slots?)" + B, "gi"), (_, t) => tok("armor", "armor", t));
+  s = s.replace(new RegExp(B + "((?:mark|marking|clear) (?:a|an|one|two|\\d+|any number of|your last)? ?Armor Slots?)" + B, "gi"), (_, t) => tok("armor", "armor", t, "armor"));
   s = s.replace(new RegExp("(?:" + B + ")?\\b(\\d*d\\d+(?:\\s?[+−-]\\s?\\d+)?)(s?)\\b(?:" + B + ")?", "g"), (_, d, pl) => tok("dice", "dice", d + pl));
-  s = s.replace(new RegExp("(?:" + B + ")?(Spellcast Roll(?: \\(\\d+\\))?)(?:" + B + ")?", "g"), (_, t) => tok("spell", "spellcast", t));
-  s = s.replace(new RegExp("\\b(" + TRAITS_RE + ")( Reaction)? Roll( \\(\\d+\\))?", "g"), (m, t) => tok("trait", R.TRAIT_KEY[t.toLowerCase()], m));
-  s = s.replace(/\b(Very Close|Very Far|Melee|Close|Far)( range)?\b/g, (m) => tok("range", "range", m));
-  s = s.replace(new RegExp("\\*(" + CONDS + ")([.,]?)\\*", "g"), (_, t, p) => tok("cond", "wound", t) + p);
+  s = s.replace(new RegExp("(?:" + B + ")?(Spellcast Roll(?: \\(\\d+\\))?)(?:" + B + ")?", "g"), (_, t) => tok("spell", "spellcast", t, "spellcast"));
+  s = s.replace(new RegExp("\\b(" + TRAITS_RE + ")( Reaction)? Roll( \\(\\d+\\))?", "g"), (m, t, rx) => tok("trait", R.TRAIT_KEY[t.toLowerCase()], m, rx ? "reaction" : "trait:" + t));
+  s = s.replace(/\b(Very Close|Very Far|Melee|Close|Far)( range)?\b/g, (m, r) => tok("range", "range", m, "range:" + r));
+  s = s.replace(new RegExp("\\*(" + CONDS + ")([.,]?)\\*", "g"), (_, t, p) => tok("cond", "wound", t, "cond:" + t) + p);
   return s;
 }
 const inline = s => tokens(esc(s)).replace(/\*\*\*(.+?)\*\*\*/g, "<b><i>$1</i></b>").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\*(.+?)\*/g, "<i>$1</i>").replace(/(^|\s)_(.+?)_/g, "$1<i>$2</i>");
@@ -172,25 +215,43 @@ function SidePanel() {
   if (!p) return null;
   const info = p.topic ? RULES_INFO[p.topic] : null;
   return html`<div class="spanel-back" onClick=${() => set(null)}></div><aside class="spanel" role="dialog" aria-label=${(info && info.title) || p.title}>
-    <div class="sp-head"><div><b>${(info && info.title) || p.title}</b>${(p.sub || (info && info.sub)) && html`<span>${p.sub || info.sub}</span>`}</div>
+    <div class="sp-head">${info && info.icon && html`<span class="sp-medal"><${Icon} n=${info.icon} /></span>`}<div class="sp-tt"><b>${(info && info.title) || p.title}</b>${(p.sub || (info && info.sub)) && html`<span>${p.sub || info.sub}</span>`}</div>
       <button class="iconbtn" aria-label="Close" onClick=${() => set(null)}>×</button></div>
     <div class="sp-body">${info ? html`<${RuleTopic} info=${info} />` : p.body}</div></aside>`;
 }
+// A rules topic as a visual breakdown: flavour, headed sections, fact tiles, equations, scales, examples (see rules-info.js).
+const GEM = { "+2": "", "+1": "v1", "+0": "v0" };
 function RuleTopic({ info }) {
-  return html`<div>${(info.parts || []).map(part => typeof part === "string" ? html`<${Md} text=${part} />`
-    : part.note ? html`<div class="note"><b>App reading</b><${Md} text=${part.note} /></div>`
-    : part.list ? html`<ul class="plain">${part.list.map(x => html`<li><${Md} text=${x} /></li>`)}</ul>` : null)}
-    ${info.src && html`<p class="src">SRD 2.0 · ${info.src}</p>`}</div>`;
+  const hf = R.books().hf;
+  const chip = x => (typeof x === "string" ? html`<span class="eq-op">${x}</span>`
+    : html`<span class=${"eq-c eq-" + x[0]}><b>${x[0] === "recall" ? BOLT : ""}${x[1]}</b>${x[2] && html`<small>${x[2]}</small>`}</span>`);
+  return html`<div class="rtopic">
+    ${info.flavor && html`<p class="rp-flavor">${info.flavor}</p>`}
+    ${(info.parts || []).map(part => typeof part === "string" ? html`<${Md} cls="rp-p" text=${part} />`
+      : part.h ? html`<div class="rp-h"><span class="hmedal"><${Icon} n=${part.i || "book"} /></span><span>${part.h}</span><i class="rule"></i></div>`
+      : part.facts ? html`<div class="rp-facts">${part.facts.filter(f => !f[3] || hf).map(([i, l, x]) => html`<div class="rp-fact"><span class="rp-fi"><${Icon} n=${i} /></span><div><b>${l}</b><${Md} text=${x} /></div></div>`)}</div>`
+      : part.eq ? html`<div class="rp-eq">${part.eq.reduce((o, x, i, a) => (typeof a[i - 1] === "string" && i > 0 ? o : o.concat(typeof x === "string" && a[i + 1] ? html`<span class="eq-g">${chip(x)}${chip(a[i + 1])}</span>` : chip(x))), [])}</div>`
+      : part.scale ? html`<div class="rp-scale">${part.scale.map(([l, sub, r], k) => html`<div class=${"rs rs" + (k + 1)}><b>${l}</b><small>${sub}</small><span>${r}</span></div>`)}</div>`
+      : part.gems ? html`<div class="rp-gems">${part.gems.map(g => html`<span class=${"val mini " + (g in GEM ? GEM[g] : "vn")}>${g}</span>`)}</div>`
+      : part.steps ? html`<ol class="rp-steps">${part.steps.map(x => html`<li><${Md} text=${x} /></li>`)}</ol>`
+      : part.ex ? html`<div class="rp-ex"><span class="rp-ex-l"><${Icon} n="quill" />Example</span><${Md} text=${part.ex} /></div>`
+      : part.note ? html`<div class="note"><b>App reading</b><${Md} text=${part.note} /></div>`
+      : part.list ? html`<ul class="rp-list">${part.list.map(x => html`<li><${Md} text=${x} /></li>`)}</ul>` : null)}
+    ${info.src && html`<p class="src"><${Icon} n="book" />SRD 2.0 · ${info.src}</p>`}</div>`;
 }
 
 /* ================= small parts ================= */
 // A row of slot boxes. Left-click an empty box to mark up to it; right-click (long-press) a marked box to clear back below it.
 function Track({ label, value, max, onSet, kind = "", lock = 0, verb = ["Mark", "Clear"], count }) {
+  const prev = useRef(value), fx = useRef(null);
+  if (prev.current !== value) { fx.current = value > prev.current ? { lo: prev.current + 1, hi: value, d: "in" } : { lo: value + 1, hi: prev.current, d: "out" }; prev.current = value; }
+  const F = fx.current;
   const out = [];
   for (let i = 1; i <= max + lock; i++) {
     if (i > max) { out.push(html`<span class="slot locked" title="Scarred: this slot is gone"></span>`); continue; }
     const on = i <= value;
-    out.push(html`<button type="button" class=${"slot " + kind + (on ? " on" : "")} aria-label=${`${label} ${i}: ${on ? verb[1].toLowerCase() : verb[0].toLowerCase()}`} aria-pressed=${on}
+    const anim = F && i >= F.lo && i <= F.hi;
+    out.push(html`<button type="button" class=${"slot " + kind + (on ? " on" : "") + (anim ? " fx-" + F.d : "")} style=${anim ? `--k:${F.d === "in" ? i - F.lo : F.hi - i}` : ""} aria-label=${`${label} ${i}: ${on ? verb[1].toLowerCase() : verb[0].toLowerCase()}`} aria-pressed=${on}
       ...${pressProps(() => { if (!on) onSet(i); else toast(`${MOUSE_R} to ${verb[1].toLowerCase()}.`); }, () => on && onSet(i - 1),
         () => ({ title: `${label} ${value}/${max}`, lines: [on ? `${MOUSE_R} to ${verb[1].toLowerCase()} to ${i - 1}` : `${MOUSE_L} to ${verb[0].toLowerCase()} up to ${i}`] }))}></button>`);
   }
@@ -288,6 +349,7 @@ function App() {
   const [books, setBooks] = useState(false);
   R.setBooks(Store.state.books);   // which rulebooks this table uses: everything below filters by it
   const lastEdit = useRef({});
+  useTokenCards();
   useEffect(() => lsSet("dh-view", view), [view]);
   useEffect(() => { const f = () => force(x => x + 1); Store.listeners.add(f); Store.init(); return () => Store.listeners.delete(f); }, []);
   useEffect(() => {
@@ -341,7 +403,7 @@ function App() {
     ${Store.error && html`<div class="banner">Couldn't load the shared characters just now. Reload the page to try again.</div>`}
     ${view === "gm" && gm ? html`<${GMView} chars=${list} all=${all} updateChar=${updateChar} openChar=${openChar} openBooks=${() => setBooks(true)} />` : html`
       <${Roster} list=${list} all=${all} sel=${sel} setSel=${setSel} current=${current} create=${create} startNew=${() => setMaking("choose")} />
-      ${current ? html`<${Character} c=${current} all=${all} update=${update} tab=${tab} setTab=${setTab} onDelete=${remove} />`
+      ${current ? html`<${Character} key=${current.id} c=${current} all=${all} update=${update} tab=${tab} setTab=${setTab} onDelete=${remove} />`
         : Store.mode === "loading" ? html`<div class="empty"><p class="muted">Opening the table…</p></div>`
         : html`<div class="empty"><div class="ornate">${gm ? "No characters yet" : "Welcome to the table"}</div>
             <p>Each character's sheet lives here: traits, Hope, Stress, Hit Points, armor, domain cards and gear, with the rules math done for you.</p>
@@ -425,7 +487,7 @@ function Character({ c, all, update, tab, setTab, onDelete }) {
   return html`<section class="character">
     <${Header} c=${c} d=${d} update=${update} edit=${free} setEdit=${setEdit} onLevel=${() => setLvl(true)} />
     <nav class="tabs" role="tablist">${TABS.map(([k, n, i]) => html`<button role="tab" class=${"tab t-" + k} aria-selected=${tab === k} aria-label=${n} onClick=${() => setTab(k)}><${Icon} n=${i} /><span class="tlabel">${n}</span></button>`)}</nav>
-    <div class="tabbody">
+    <div class="tabbody" key=${tab}>
       ${tab === "sheet" && html`<${SheetTab} c=${c} d=${d} update=${update} edit=${free} />`}
       ${tab === "cards" && html`<${AbilitiesTab} c=${c} d=${d} update=${update} edit=${free} />`}
       ${tab === "gear" && html`<${GearTab} c=${c} d=${d} update=${update} edit=${free} />`}
@@ -480,6 +542,7 @@ function SheetTab({ c, d, update, edit }) {
   const [useArmor, setUseArmor] = useState(false);
   const [rest, setRest] = useState(null);
   const [death, setDeath] = useState(false);
+  const [hit, setHit] = useState(null);
   const opt = Store.state.options || {};
   const sev = dmg === "" ? null : R.severity(dmg, d.major, d.severe, { massive: opt.massive });
   const canArmor = d.armor && d.armorScore > 0 && d.cur.armor < d.armorScore;
@@ -492,11 +555,12 @@ function SheetTab({ c, d, update, edit }) {
       addLog(x, `Took ${sev.d} damage: ${sev.label}${useArmor && canArmor ? ", marked an Armor Slot" : ""} → ${marked} HP`);
     });
     setDmg(""); setUseArmor(false);
+    if (marked > 0) { FX.hurt(); setHit({ band: Math.min(marked, 3), k: Date.now() }); }
     if (d.cur.hp + marked >= d.hpMax && marked > 0) setTimeout(() => setDeath(true), 50);
     else toast(marked ? `Marked ${marked} Hit Point${marked > 1 ? "s" : ""}.` : "No Hit Points marked.");
   };
   const setMark = (k, v) => update(x => { x.marks[k] = v; });
-  const traitTip = t => ({ title: `${t.n} ${R.sign(d.traits[t.k])}`, lines: [t.v, d.spellTraits.includes(t.k) ? "Your Spellcast trait" : "", d.marked.has(t.k) ? "Marked this tier: can't be raised again until the next tier." : "", ...d.mods.filter(m => m.to === t.n.toLowerCase()).map(m => `${m.from}: ${R.sign(m.v)}`)].filter(Boolean) });
+  const traitTip = t => ({ title: `${t.n} ${R.sign(d.traits[t.k])}`, lines: [t.v, d.spellTraits.includes(t.k) ? html`<span class="tip-spell"><span class="hc-medal arcane"><${Icon} n="spellcast" /></span>Your Spellcast trait: used for Spellcast Rolls</span>` : "", d.marked.has(t.k) ? "Marked this tier: can't be raised again until the next tier." : "", ...d.mods.filter(m => m.to === t.n.toLowerCase()).map(m => `${m.from}: ${R.sign(m.v)}`)].filter(Boolean) });
   return html`<div class="sheet">
     <section class="card span">
       <${Head} title="Traits" topic="traits" icon="dice" />
@@ -513,13 +577,13 @@ function SheetTab({ c, d, update, edit }) {
         <${Medal} kind="armorscore" label="Armor Score" value=${d.armorScore}>${edit && html`<${Stepper} label="Armor bonus" value=${c.bonus.armor} onSet=${v => update(x => { x.bonus.armor = v; })} />`}</${Medal}>
         <${Medal} kind="prof" label="Proficiency" value=${d.prof}>${edit && html`<${Stepper} label="Proficiency bonus" value=${c.bonus.prof} onSet=${v => update(x => { x.bonus.prof = v; })} />`}</${Medal}>
       </div>
-      <div class="row" style="margin-top:14px"><${ThresholdRuler} major=${d.major} severe=${d.severe} massive=${opt.massive} /></div>
+      <div class="row" style="margin-top:14px"><${ThresholdRuler} major=${d.major} severe=${d.severe} massive=${opt.massive} hit=${hit} /></div>
       ${d.mods.length > 0 && html`<p class="mods">${d.mods.map(m => `${m.from}: ${R.sign(m.v)} ${m.to}`).join(" · ")}</p>`}
     </section>
 
     <section class="card">
       <${Head} title="Damage & health" topic="health" icon="heart" />
-      <div class="trackrow"><span class="tl"><${Icon} n="heart" />Hit Points</span><${Track} label="Hit Points" value=${d.cur.hp} max=${d.hpMax} kind="hp" count onSet=${v => { setMark("hp", v); if (v >= d.hpMax) setTimeout(() => setDeath(true), 50); }} />
+      <div class="trackrow"><span class="tl"><${Icon} n="heart" />Hit Points</span><${Track} label="Hit Points" value=${d.cur.hp} max=${d.hpMax} kind="hp" count onSet=${v => { if (v > d.cur.hp) FX.hurt(); setMark("hp", v); if (v >= d.hpMax) setTimeout(() => setDeath(true), 50); }} />
         ${edit && html`<${Stepper} label="HP slot bonus" value=${c.bonus.hp} onSet=${v => update(x => { x.bonus.hp = v; })} />`}</div>
       <div class="trackrow"><span class="tl"><${Icon} n="stress" />Stress</span><${Track} label="Stress" value=${d.cur.stress} max=${d.stressMax} kind="stress" count onSet=${v => setMark("stress", v)} />
         ${edit && html`<${Stepper} label="Stress slot bonus" value=${c.bonus.stress} onSet=${v => update(x => { x.bonus.stress = v; })} />`}</div>
@@ -567,19 +631,25 @@ function WeaponLines({ c, d }) {
   const ws = R.equipped(c);
   if (!ws.length) return html`<p class="muted">No weapon equipped. Unarmed attacks use Strength or Finesse and deal ${d.prof}d4 damage. Equip weapons on the Gear tab.</p>`;
   return html`<div class="wlines">${ws.map(w => { const W = R.weaponStats(w); if (!W) return null;
-    return html`<div class="wline"><div class="wn"><${Icon} n="weapon" />${W.name}<span class="tag">${w.slot === "primary" ? "Primary" : "Secondary"}</span></div>
+    const own = R.gearName(w, W) !== W.name;
+    return html`<div class="wline"><div class="wn"><${Icon} n="weapon" /><span class="wnm"><b>${R.gearName(w, W)}</b>${own && html`<small>${W.name}</small>`}</span><span class="tag">${w.slot === "primary" ? "Primary" : "Secondary"}</span></div>
       <${WeaponStats} W=${W} d=${d} />${W.feat && html`<${Md} cls="small" text=${W.feat} />`}</div>`; })}</div>`;
 }
 const COND = ["Hidden", "Restrained", "Vulnerable"];
 function Conditions({ c, d, update }) {
   const [v, setV] = useState("");
   const add = n => { n = n.trim(); if (!n || c.conditions.includes(n)) return; update(x => { x.conditions.push(n); }); setV(""); };
+  const auto = d.vulnerable && !c.conditions.includes("Vulnerable");
+  const active = c.conditions.concat(auto ? ["Vulnerable"] : []);
   return html`<div class="conds">
-    ${c.conditions.map((n, i) => html`<button class="chip on" title="Remove" onClick=${() => update(x => { x.conditions.splice(i, 1); })}>${n} ×</button>`)}
-    ${d.vulnerable && !c.conditions.includes("Vulnerable") && html`<span class="chip auto">Vulnerable (all Stress marked)</span>`}
+    ${c.conditions.map((n, i) => html`<button class="chip cond on" title="Remove" onClick=${() => update(x => { x.conditions.splice(i, 1); })}><${Icon} n=${(gloss("cond:" + n) || {}).icon || "wound"} />${n} ×</button>`)}
+    ${auto && html`<span class="chip cond auto"><${Icon} n="wound" />Vulnerable (all Stress marked)</span>`}
     ${COND.filter(n => !c.conditions.includes(n)).map(n => html`<button class="chip" onClick=${() => add(n)}>+ ${n}</button>`)}
     <form class="inline" onSubmit=${e => { e.preventDefault(); add(v); }}><input placeholder="Other condition" value=${v} onInput=${e => setV(e.target.value)} aria-label="Other condition" /></form>
-  </div>`;
+  </div>
+  ${active.length > 0 && html`<div class="cond-rules">${active.map(n => { const g = gloss("cond:" + n);
+    return html`<div class="cond-rule"><span class="hc-medal"><${Icon} n=${g.icon} /></span><div><b>${n}${auto && n === "Vulnerable" ? html` <small>while all Stress is marked</small>` : ""}</b><${Md} text=${g.md} /></div></div>`; })}</div>`}
+  ${!active.length && html`<p class="muted small">No conditions. Choose one above to see what it does.</p>`}`;
 }
 
 /* ================= rests ================= */
@@ -661,7 +731,7 @@ function DiceDock({ c, update }) {
     const own = ownRolls();
     if (own && (hand.h === "" || hand.f === "" || (adv && hand.a === ""))) { toast("Type what you rolled on each die."); return; }
     const r = R.duality({ mod: tmod + emod + num(mod), adv, difficulty: diff, hope: own ? num(hand.h) : undefined, fear: own ? num(hand.f) : undefined, advDie: own ? num(hand.a) : undefined });
-    setRes(r);
+    setRes(Object.assign(r, { k: Date.now() }));
     if (c && d) update(x => {
       let hope = num(x.marks.hope) - exps.length;
       if (!reaction && r.withHope) hope += 1;
@@ -686,7 +756,7 @@ function DiceDock({ c, update }) {
       <label class="field tiny"><span>Fear die</span><input type="number" min="1" max="12" value=${hand.f} onInput=${e => setHand(Object.assign({}, hand, { f: e.target.value }))} /></label>
       ${adv !== 0 && html`<label class="field tiny"><span>d6</span><input type="number" min="1" max="6" value=${hand.a} onInput=${e => setHand(Object.assign({}, hand, { a: e.target.value }))} /></label>`}</div>`}
     <button class="btn primary wide" onClick=${go}>Roll${exps.length ? ` (spend ${exps.length} Hope)` : ""} · ${R.sign(tmod + emod + num(mod))}</button>
-    ${res && html`<div class=${"rollres " + (res.crit ? "crit" : res.withHope ? "hope" : "fear")}>
+    ${res && html`<div key=${res.k} class=${"rollres " + (res.crit ? "crit" : res.withHope ? "hope" : "fear")}>
       <div class="dice"><span class="die h">${res.h}</span><span class="die f">${res.f}</span>${res.adv ? html`<span class="die a">${res.adv > 0 ? "+" : "−"}${res.a}</span>` : ""}</div>
       <b class="tot">${res.total}</b>
       <span>${res.crit ? "Critical success!" : res.withHope ? "with Hope" : "with Fear"}${res.success === true && !res.crit ? " · success" : res.success === false ? " · failure" : ""}</span>
@@ -736,7 +806,7 @@ function AbilitiesTab({ c, d, update, edit }) {
       <div class="cards">${c.cards.map((x, i) => x.where !== "vault" && html`<${DomainCard} name=${x.name} onMove=${() => recall(i, R.card(x.name))} moveLabel="To vault" onRemove=${edit ? () => update(y => { y.cards.splice(i, 1); }) : null} />`)}</div>
       ${!d.loadout.length && html`<p class="muted">No domain cards yet.</p>`}
       ${d.vault.length > 0 && html`<${Head} level=${3} title=${`Vault · ${d.vault.length}`} />
-        <div class="cards">${c.cards.map((x, i) => x.where === "vault" && html`<${DomainCard} vaulted name=${x.name} onMove=${() => recall(i, R.card(x.name))} moveLabel=${`Recall${R.card(x.name) && R.card(x.name).recall ? ` · ${R.card(x.name).recall} Stress` : ""}`} onRemove=${edit ? () => update(y => { y.cards.splice(i, 1); }) : null} />`)}</div>`}
+        <div class="cards">${c.cards.map((x, i) => x.where === "vault" && html`<${DomainCard} vaulted name=${x.name} onMove=${() => recall(i, R.card(x.name))} moveLabel=${html`${BOLT}Recall${R.card(x.name) && R.card(x.name).recall ? ` · ${R.card(x.name).recall} Stress` : ""}`} onRemove=${edit ? () => update(y => { y.cards.splice(i, 1); }) : null} />`)}</div>`}
     </section>`}
     ${show("class") && html`<section class="card">
       <${Head} title=${K ? `${K.name} abilities` : "Class abilities"} topic="classes" icon=${K ? clsIcon(K.name) : "spell"} />
@@ -793,6 +863,19 @@ function CardPicker({ c, onClose, onPick, forLevel, maxLevel, title = "Add a dom
 }
 // A framed list that shows one page at a time, with clear ◀ ▶ buttons and page gems, instead of a scrolling box.
 /* ================= gear tab ================= */
+// A name you give a weapon or armor; the item's own name stays beneath it as its type.
+function GearTitle({ g, S, icon, tags, onRename }) {
+  const [on, setOn] = useState(false);
+  const ref = useRef();
+  (preactHooks.useLayoutEffect || useEffect)(() => { if (on && ref.current) { ref.current.focus(); ref.current.select(); } }, [on]);
+  const base = S ? S.name : g.name, own = R.gearName(g, S) !== base;
+  return html`<div class=${"whead" + (own ? " named" : "")}><span class="wmedal"><${Icon} n=${icon} /></span>
+    <div class="wtitle">${on ? html`<input ref=${ref} class="rename" value=${g.label || ""} placeholder=${base} aria-label="Name"
+        onInput=${e => onRename(e.target.value)} onBlur=${() => setOn(false)} onKeyDown=${e => { if (e.key === "Enter" || e.key === "Escape") setOn(false); }} />`
+      : html`<span class="wname"><b>${R.gearName(g, S)}</b><button class="iconbtn rn" aria-label=${`Rename ${base}`} title="Give it a name" onClick=${() => setOn(true)}><${Icon} n="quill" /></button></span>`}
+      ${own && !on && html`<span class="wsub">${base}</span>`}</div>
+    ${tags}</div>`;
+}
 function GearTab({ c, d, update, edit }) {
   const [wpick, setWpick] = useState(null); const [apick, setApick] = useState(false); const [ipick, setIpick] = useState(null);
   const slots = { primary: c.weapons.find(w => w.slot === "primary"), secondary: c.weapons.find(w => w.slot === "secondary") };
@@ -810,7 +893,8 @@ function GearTab({ c, d, update, edit }) {
       ${burdenWarn && html`<p class="warn">${burdenWarn}</p>`}
       ${tierWarn && html`<p class="warn">You can't equip weapons or armor of a higher tier than yours (tier ${d.tier}).</p>`}
       <div class="wcards">${c.weapons.map((w, i) => { const W = R.weaponStats(w); return html`<div class=${"wcard" + (w.slot !== "pack" ? " eq" : "")}>
-        <div class="whead"><${Icon} n="weapon" /><b>${W ? W.name : w.name}</b>${W && W.tier && html`<span class="tag">Tier ${W.tier}</span>`}${W && html`<span class="tag">${W.cat}</span>`}</div>
+        <${GearTitle} g=${w} S=${W} icon="weapon" onRename=${v => update(x => { x.weapons[i].label = v; })}
+          tags=${html`${W && W.tier && html`<span class="tag">Tier ${W.tier}</span>`}${W && W.cat && html`<span class="tag">${W.cat}</span>`}`} />
         ${w.custom && edit ? html`<div class="grid4"><${Field} label="Name" value=${w.name} onInput=${v => update(x => { x.weapons[i].name = v; })} />
             <${Select} label="Trait" value=${w.trait} options=${R.TRAITS.map(t => t.n)} onChange=${v => update(x => { x.weapons[i].trait = v; })} />
             <${Select} label="Range" value=${w.range} options=${R.RANGES} onChange=${v => update(x => { x.weapons[i].range = v; })} />
@@ -828,7 +912,8 @@ function GearTab({ c, d, update, edit }) {
     <section class="card">
       <${Head} title="Armor" topic="armor" icon="helm" tail=${html`<button class="btn small" onClick=${() => setApick(true)}>+ Armor</button>`} />
       <div class="wcards">${c.armor.map((a, i) => { const A = R.armorStats(a); return html`<div class=${"wcard" + (a.worn ? " eq" : "")}>
-        <div class="whead"><${Icon} n="helm" /><b>${A ? A.name : a.name}</b>${A && A.tier && html`<span class="tag">Tier ${A.tier}</span>`}${a.worn && html`<span class="tag">Worn</span>`}</div>
+        <${GearTitle} g=${a} S=${A} icon="helm" onRename=${v => update(x => { x.armor[i].label = v; })}
+          tags=${html`${A && A.tier && html`<span class="tag">Tier ${A.tier}</span>`}${a.worn && html`<span class="tag">Worn</span>`}`} />
         ${a.custom && edit ? html`<div class="grid4"><${Field} label="Name" value=${a.name} onInput=${v => update(x => { x.armor[i].name = v; })} />
             <${Field} label="Major" type="number" value=${a.major} onInput=${v => update(x => { x.armor[i].major = v; })} />
             <${Field} label="Severe" type="number" value=${a.severe} onInput=${v => update(x => { x.armor[i].severe = v; })} />
@@ -978,12 +1063,13 @@ function Books({ onClose, first }) {
 
 function TraitShield({ t, value, marked, spell, onClick, armed, pick, children }) {
   const T = onClick ? "button" : "div";
-  return html`<div class=${"trait-wrap" + (marked ? " marked" : "") + (pick ? " pick" : "") + (armed ? " armed" : "")}>
+  // Name and verbs sit in the shield's broad top; the value sits in its point, like a heraldic charge.
+  return html`<div class="trait-col"><div class=${"trait-wrap" + (marked ? " marked" : "") + (pick ? " pick" : "") + (armed ? " armed" : "") + (spell ? " spell" : "")}>
     <${T} class="trait" type=${onClick ? "button" : undefined} onClick=${onClick}>
-      ${spell && html`<span class="tspell" title="Spellcast trait"><${Icon} n="spellcast" /></span>`}${marked && html`<span class="tmark" title="Marked this tier">◆</span>`}
-      <span class="ti"><${Icon} n=${t.k} /></span><span class="tn">${t.n}</span>
-      <b class=${"tv" + (value != null && value < 0 ? " neg" : "")}>${value == null ? "?" : R.sign(value)}</b><span class="tverbs">${t.v}</span>${children}
-    </${T}></div>`;
+      ${spell && html`<span class="tspell" aria-label="Spellcast trait"><${Icon} n="spellcast" /></span>`}${marked && html`<span class="tmark" title="Marked this tier">◆</span>`}
+      <span class="ti"><${Icon} n=${t.k} /></span><span class="tn">${t.n}</span><span class="tverbs">${t.v}</span>
+      <b class=${"tv" + (value != null && value < 0 ? " neg" : "")}>${value == null ? "?" : R.sign(value)}</b>
+    </${T}></div>${children && html`<div class="trait-under">${children}</div>`}</div>`;
 }
 
 function Medal({ kind, label, value, children }) {
@@ -991,9 +1077,9 @@ function Medal({ kind, label, value, children }) {
 }
 // Damage thresholds as a ruler: Minor | Major | Severe, with the numbers on the cuts and HP marked below.
 
-function ThresholdRuler({ major, severe, massive }) {
+function ThresholdRuler({ major, severe, massive, hit }) {
   return html`<div class="ruler"><div class="rl-title">Damage thresholds</div>
-    <div class="rl-bar"><div class="seg3 s1"><b>Minor</b><small>below ${major}</small></div><div class="cut" title="Major threshold">${major}</div>
+    <div class=${"rl-bar" + (hit ? " hit-" + hit.band : "")} key=${hit ? hit.k : 0}><div class="seg3 s1"><b>Minor</b><small>below ${major}</small></div><div class="cut" title="Major threshold">${major}</div>
       <div class="seg3 s2"><b>Major</b><small>${major}–${severe - 1}</small></div><div class="cut" title="Severe threshold">${severe}</div><div class="seg3 s3"><b>Severe</b><small>${severe}+</small></div></div>
     <div class="rl-hp"><span>mark 1 HP</span><span></span><span>mark 2 HP</span><span></span><span>mark 3 HP${massive ? ` · ${severe * 2}+: 4` : ""}</span></div></div>`;
 }
