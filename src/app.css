@@ -137,7 +137,7 @@ h3.h { font-size: .86rem; margin-top: 14px; }
 
 /* ---------- nameplate (character header) ---------- */
 .head { display: flex; gap: 20px; align-items: center; padding: 20px 22px; }
-.portrait { width: 112px; height: 112px; border-radius: 50%; border: 2px solid var(--brass); background: radial-gradient(circle at 35% 30%, #5a34a6, #1c1030);
+.portrait { position: relative; width: 112px; height: 112px; border-radius: 50%; border: 2px solid var(--brass); background: radial-gradient(circle at 35% 30%, #5a34a6, #1c1030);
   box-shadow: 0 0 0 4px #140d22, 0 0 0 5px var(--brass-lo), 0 0 0 9px rgba(122,74,214,.25), 0 8px 24px rgba(0,0,0,.5);
   display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: pointer; flex: none; font: 700 2rem var(--display); padding: 0; color: var(--brass-hi); }
 .portrait img { width: 100%; height: 100%; object-fit: cover; }
@@ -198,12 +198,11 @@ h3.h { font-size: .86rem; margin-top: 14px; }
 .trait-wrap.marked::before { background: linear-gradient(180deg, #d7c0ff, var(--purple) 50%, var(--purple-lo)); }
 .trait .tmark { position: absolute; top: 6px; right: 10px; font-size: .9rem; color: var(--purple-hi); }
 /* The Spellcast trait: a large arcane hand glowing in the shield's point, behind the value. */
-.trait .tspell { position: absolute; top: 8px; right: 9px; z-index: 2; width: 34px; height: 34px; font-size: 34px; line-height: 0; color: #b28cff; opacity: .85; pointer-events: none;
-  filter: drop-shadow(0 0 5px rgba(178,140,255,.6)); transition: filter .25s, opacity .25s; }
+.trait .tspell { position: absolute; top: 8px; right: 9px; z-index: 2; width: 34px; height: 34px; font-size: 34px; line-height: 0; color: #b28cff; opacity: .4; pointer-events: none;
+  filter: drop-shadow(0 0 3px rgba(178,140,255,.4)); transition: filter .25s, opacity .25s; }
 .trait-wrap.spell:hover .tspell, .trait-wrap.spell:focus-within .tspell { opacity: .95;
   filter: drop-shadow(0 0 .6px #f1e6ff) drop-shadow(0 0 .6px #f1e6ff) drop-shadow(0 0 10px rgba(196,160,255,.85)); animation: handHover 1.8s ease-in-out infinite; }
 @keyframes handHover { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035); } }
-.trait-wrap.spell .trait { background: radial-gradient(70px 60px at 50% 78%, rgba(154,98,240,.45), transparent 70%), linear-gradient(180deg, #3a2668, #22163e 70%); }
 
 button.trait { cursor: pointer; }
 .trait-wrap.pick:hover::before { background: linear-gradient(180deg, #fff1bf, var(--gold)); }
@@ -211,12 +210,11 @@ button.trait { cursor: pointer; }
 .trait-col .stepper { margin: 0; }
 @keyframes glow { from { filter: brightness(1); } to { filter: brightness(1.25); } }
 /* defense: medallions and the thresholds ruler */
-.medals { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+.medals { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; justify-content: space-evenly; }
 .medal { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 92px; }
-.medal .m { width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; position: relative; font: 800 2rem var(--display); color: #fff6dd; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
+.medal .m { isolation: isolate; width: 84px; height: 84px; display: flex; align-items: center; justify-content: center; position: relative; font: 800 2rem var(--display); color: #fff6dd; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
 .medal .m::before { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, var(--brass-hi), var(--brass-lo)); clip-path: var(--shape); }
 .medal .m::after { content: ""; position: absolute; inset: 3px; z-index: -1; background: radial-gradient(circle at 40% 30%, #6b40c4, #24143f); clip-path: var(--shape); }
-.medal .m { isolation: isolate; }
 .medal.evasion .m { --shape: polygon(50% 0, 100% 12%, 100% 55%, 50% 100%, 0 55%, 0 12%); }
 .medal.armorscore .m { --shape: circle(50%); }
 .medal.prof .m { --shape: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
@@ -281,7 +279,7 @@ button.trait { cursor: pointer; }
 .burden .flip { transform: scaleX(-1); }
 .burden:hover { opacity: 1; filter: drop-shadow(0 0 6px rgba(232,195,90,.7)); }
 .wtags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex-basis: 100%; padding-left: 46px; margin-top: -2px; }
-.wcard { position: relative; } .wcard .whead { padding-right: 44px; }
+.wcard .whead { padding-right: 44px; }
 .wcard .burden { position: absolute; top: 14px; right: 14px; font-size: 1.3rem; }
 .whead .burden { margin-left: 0; }
 .chips input[type=color] { width: 30px; height: 30px; padding: 0; border: 2px solid #140d22; border-radius: 50%; box-shadow: 0 0 0 1px var(--line2); cursor: pointer; overflow: hidden; }
@@ -359,9 +357,8 @@ button.trait { cursor: pointer; }
 .dc-lvl { width: 34px; height: 38px; display: flex; align-items: center; justify-content: center; font: 800 1.15rem var(--display); color: #24170a; clip-path: polygon(50% 0, 100% 22%, 100% 78%, 50% 100%, 0 78%, 0 22%);
   background: linear-gradient(180deg, var(--brass-hi), var(--brass) 55%, var(--brass-lo)); flex: none; }
 .dc-dom { position: absolute; left: 50%; top: 20px; transform: translateX(-50%); white-space: nowrap; letter-spacing: .2em !important; font-family: var(--display); font-weight: 800; font-size: .86rem; letter-spacing: .24em; text-transform: uppercase; color: #fff8e4; text-shadow: 0 1px 2px rgba(0,0,0,.6); }
-.dc-rec { display: inline-flex; align-items: center; gap: 3px; font: 700 .95rem var(--display); color: #fff3d0; background: rgba(0,0,0,.35); border: 1px solid rgba(255,243,208,.4); border-radius: 999px; padding: 2px 9px 2px 6px; }
+.dc-rec { margin-left: auto; display: inline-flex; align-items: center; gap: 3px; font: 700 .95rem var(--display); color: #fff3d0; background: rgba(0,0,0,.35); border: 1px solid rgba(255,243,208,.4); border-radius: 999px; padding: 2px 9px 2px 6px; }
 .dc-rec .ico { color: var(--gold); font-size: .95rem; }
-.dc-rec { margin-left: auto; }
 .dc-medal { position: absolute; left: 50%; top: 46px; transform: translateX(-50%); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #fff8e4; z-index: 2;
   background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--dc) 80%, #fff 15%), color-mix(in srgb, var(--dc) 60%, #000 40%)); border: 2px solid var(--brass); box-shadow: 0 0 0 3px #150e24, 0 4px 10px rgba(0,0,0,.5); }
 .dc-body { padding: 38px 14px 12px; display: flex; flex-direction: column; flex: 1; }
@@ -372,6 +369,26 @@ button.trait { cursor: pointer; }
 .dc.picked { box-shadow: 0 0 0 1px var(--brass-hi), 0 0 0 4px #140d22, 0 0 0 6px var(--gold), 0 0 30px rgba(232,195,90,.45); }
 .dc.vaulted { filter: saturate(.55) brightness(.85); }
 .dc.hf::after { content: "Hope & Fear"; position: absolute; top: 56px; right: 10px; font: .58rem var(--display); letter-spacing: .14em; color: var(--muted); }
+
+/* grimoire: a small tome inside the card, one spell per page */
+.tome { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
+.tome-tabs { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
+.tome-tab { border: 1px solid color-mix(in srgb, var(--dc) 55%, var(--brass-lo)); border-bottom-width: 3px; background: rgba(0,0,0,.25); color: var(--ink2); border-radius: 3px 3px 0 0;
+  padding: 3px 8px; font: 600 .7rem var(--display); letter-spacing: .06em; cursor: pointer; }
+.tome-tab:hover { color: var(--brass-hi); }
+.tome-tab.on { background: color-mix(in srgb, var(--dc) 45%, #1b1230); border-color: var(--brass); color: #fff3d0; }
+.tome-page { position: relative; min-height: 170px; padding: 10px 12px 10px 18px; border-radius: 2px 6px 6px 2px;
+  background: linear-gradient(90deg, rgba(0,0,0,.45), rgba(0,0,0,.12) 8%, rgba(255,240,210,.05) 60%, rgba(0,0,0,.15)), #1d1532;
+  border: 1px solid var(--line2); border-left: 3px double var(--brass-lo); box-shadow: inset 0 0 18px rgba(0,0,0,.35); transform-origin: left center; animation: pageTurn .35s ease-out; }
+.tome-spell { margin: 0 0 4px; font-size: .9rem; color: var(--brass-hi); text-transform: none; letter-spacing: .04em; font-style: italic; font-family: var(--book); font-weight: 600; }
+@keyframes pageTurn { from { opacity: 0; transform: perspective(600px) rotateY(-24deg); } to { opacity: 1; transform: none; } }
+.tome-nav { display: flex; align-items: center; justify-content: space-between; font: .72rem var(--display); letter-spacing: .1em; color: var(--muted); }
+.tome-turn { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--brass-lo); background: radial-gradient(circle at 35% 30%, #4b2c8a, #1e1233); color: var(--brass-hi); cursor: pointer; }
+.tome-turn:disabled { opacity: .3; cursor: default; }
+/* gold: its own purse at the top of the Gear tab */
+.card.purse { border-color: rgba(232,195,90,.55); background: radial-gradient(600px 160px at 15% 0%, rgba(232,195,90,.14), transparent 70%), linear-gradient(180deg, rgba(52,38,62,.95), rgba(30,21,51,.95)); }
+.card.purse .h .hmedal { background: radial-gradient(circle at 35% 30%, #fff1bf, var(--gold) 50%, #8a6a2a); color: #3a2608; }
+.purse-sum { font: 700 .82rem var(--display); letter-spacing: .08em; color: var(--gold); text-transform: none; white-space: nowrap; }
 
 /* ---------- catalog: framed, paged lists with visible navigation ---------- */
 .catalog { border: 1px solid var(--brass-lo); border-radius: 6px; background: linear-gradient(180deg, #221737, #170f27); margin: 10px 0; overflow: hidden; }
@@ -400,7 +417,7 @@ div.item-card { cursor: default; }
 
 /* ---------- gear ---------- */
 .wcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.wcard { border: 1px dashed var(--line2); border-radius: 6px; padding: 12px 14px; background: rgba(0,0,0,.18); }
+.wcard { position: relative; border: 1px dashed var(--line2); border-radius: 6px; padding: 12px 14px; background: rgba(0,0,0,.18); }
 .wcard.eq { border: 1px solid var(--brass); background: linear-gradient(180deg, rgba(122,74,214,.18), rgba(0,0,0,.15)); }
 .whead { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-family: var(--display); color: #fff3d0; }
 .wmedal { width: 36px; height: 36px; flex: none; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; color: var(--brass-hi);
@@ -592,8 +609,6 @@ div.item-card { cursor: default; }
 .g-arrow.next.finish .orb { background: radial-gradient(circle at 35% 30%, #fff1bf, var(--gold) 50%, #8a6a2a); color: #24170a; box-shadow: 0 0 0 4px #140d22, 0 0 0 5px var(--brass-hi), 0 0 30px rgba(232,195,90,.7); }
 .g-arrow .al { font-family: var(--display); font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; max-width: 90px; text-align: center; text-shadow: 0 1px 2px #000; }
 .g-arrow:disabled { opacity: .25; cursor: default; }
-.g-foot { display: none; }
-.g-start { text-align: center; padding: 8px; }
 .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin: 10px 0; }
 .picks.two { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
 .pickcard { position: relative; border: 1px solid var(--line2); background: linear-gradient(180deg, #2c1f48, #1d1431); border-radius: 6px; padding: 12px 14px; text-align: left; cursor: pointer; display: flex; flex-direction: column; gap: 4px; color: var(--ink); }
@@ -689,7 +704,6 @@ div.item-card { cursor: default; }
 .btn.danger.solid { background: linear-gradient(180deg, #b8404f, #7c1f2d); color: #fff1f1; border-color: #f0a3ad; }
 .rollres .working { grid-column: 1 / -1; font-family: var(--book); font-size: 1rem; color: var(--ink2); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 .rollres .working i { color: var(--muted); font-size: .9em; } .rollres .working b { color: #fff3d0; }
-.portrait { position: relative; }
 .portrait .pedit { position: absolute; right: 6px; bottom: 6px; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 14px;
   background: #24183c; border: 1px solid var(--brass); color: var(--brass-hi); opacity: 0; transition: opacity .2s; }
 .portrait:hover .pedit, .portrait:focus-visible .pedit { opacity: 1; }
