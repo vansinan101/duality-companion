@@ -170,6 +170,12 @@
     const a = worn(c), A = armorStats(a);
     if (A) featureMods(A.feat).forEach(m => mods.push(Object.assign(m, { from: A.name })));
     equipped(c).forEach(w => { const W = weaponStats(w); if (W) featureMods(W.feat).forEach(m => mods.push(Object.assign(m, { from: W.name }))); });
+    // Worn items that always apply (SRD relics: "You gain a +1 bonus to your Agility."). Conditional items are left to the player.
+    (c.items || []).filter(it => it.worn && it.kind !== "consumable").forEach(it => {
+      const t = String(it.text || (byName("items", it.name) || {}).x || "").replace(/\*/g, "");
+      const m = /^You gain a ([+−-]?\d+) bonus to your (Agility|Strength|Finesse|Instinct|Presence|Knowledge|Evasion)\b/i.exec(t);
+      if (m) mods.push({ v: +m[1].replace("−", "-"), to: m[2].toLowerCase(), from: it.name });
+    });
     const profNow = proficiency(c);
     heritageFeatures(c).forEach(h => (HERITAGE_MODS[h.f.n] || []).forEach(m => mods.push({ v: m.v === "prof" ? profNow : m.v, to: m.to, from: `${h.f.n} (${h.a})` })));
     const modSum = to => mods.filter(m => m.to === to).reduce((s, m) => s + m.v, 0);
@@ -184,6 +190,13 @@
     const hopeMax = clamp(MAX.hope - num(c.scars) + num(c.bonus.hope), 0, 8);
     const evasion = (K ? K.evasion : 10) + (n.evasion || 0) + num(c.bonus.evasion) + modSum("evasion");
     const armorScore = clamp((A ? A.score : 0) + num(c.bonus.armor) + modSum("armor score"), 0, MAX.armor);
+    // spellcasting (needed here: some armor adds the Spellcast trait to thresholds)
+    const sub = subcls(c.sub), msub = c.multi && c.multi.sub ? subcls(c.multi.sub) : null;
+    const spellTraits = [sub && sub.spell, msub && msub.spell].filter(Boolean).map(x => TRAIT_KEY[x.toLowerCase()]).filter(Boolean);
+    // Armor features that scale (SRD: Mage Robes "Enchanted", Rune-Forged Exosuit "Attuned").
+    // APP READING: with no Spellcast trait, or a negative one, the bonus is 0.
+    if (A && /damage thresholds equal to your Spellcast trait/i.test(A.feat || "")) mods.push({ v: Math.max(0, ...spellTraits.map(k => traits[k])), to: "damage thresholds", from: A.name });
+    if (A && /damage thresholds equal to your tier/i.test(A.feat || "")) mods.push({ v: tier, to: "damage thresholds", from: A.name });
     const thrB = modSum("damage thresholds");
     const major = (A ? A.major + c.level : c.level) + num(c.bonus.major) + thrB + modSum("major damage threshold");
     const severe = (A ? A.severe + c.level : c.level * 2) + num(c.bonus.severe) + thrB + modSum("severe damage threshold");
@@ -191,9 +204,6 @@
     // experiences
     const eb = expBonus(c);
     const exps = c.experiences.map(e => ({ id: e.id, name: e.name, mod: num(e.base, 2) + (eb[e.id] || 0) }));
-    // spellcasting
-    const sub = subcls(c.sub), msub = c.multi && c.multi.sub ? subcls(c.multi.sub) : null;
-    const spellTraits = [sub && sub.spell, msub && msub.spell].filter(Boolean).map(x => TRAIT_KEY[x.toLowerCase()]).filter(Boolean);
     const domains = K ? K.domains.slice() : [];
     if (c.multi && c.multi.domain && !domains.includes(c.multi.domain)) domains.push(c.multi.domain);
     const loadout = c.cards.filter(x => x.where !== "vault"), vault = c.cards.filter(x => x.where === "vault");
@@ -203,6 +213,7 @@
     };
     return {
       tier, prof, traits, traitAdv, mods, evasion, armorScore, major, severe, hpMax, stressMax, hopeMax, exps, cur,
+      worn: (c.items || []).filter(it => it.worn && it.kind !== "consumable"),
       cls: K, sub, msub, subTier: subclassTier(c), spellTraits, domains, loadout, vault, armor: a, armorStats: A,
       vulnerable: cur.stress >= stressMax, down: cur.hp >= hpMax, adv: { n, byTier }, marked: markedTraits(c),
       cardCount: c.cards.length, cardsExpected: 2 + (c.level - 1) + (n.card || 0),

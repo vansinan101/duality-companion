@@ -598,11 +598,13 @@ function SheetTab({ c, d, update, edit }) {
     else toast(marked ? `Marked ${marked} Hit Point${marked > 1 ? "s" : ""}.` : "No Hit Points marked.");
   };
   const setMark = (k, v) => update(x => { x.marks[k] = v; });
-  const traitTip = t => ({ title: `${t.n} ${R.sign(d.traits[t.k])}`, lines: [t.v, d.spellTraits.includes(t.k) ? html`<span class="tip-spell"><span class="hc-medal arcane"><${Icon} n="spellcast" /></span>Your Spellcast trait: used for Spellcast Rolls</span>` : "", d.marked.has(t.k) ? "Marked this tier: can't be raised again until the next tier." : "", ...d.mods.filter(m => m.to === t.n.toLowerCase()).map(m => `${m.from}: ${R.sign(m.v)}`)].filter(Boolean) });
+  // The shield already shows name, verbs and value, so the hover card only appears when there's more to say.
+  const traitTip = t => { const lines = [d.spellTraits.includes(t.k) ? html`<span class="tip-spell"><span class="hc-medal arcane"><${Icon} n="spellcast" /></span>Your Spellcast trait: used for Spellcast Rolls</span>` : "", d.marked.has(t.k) ? "Marked this tier: can't be raised again until the next tier." : "", ...d.mods.filter(m => m.to === t.n.toLowerCase()).map(m => `${m.from}: ${R.sign(m.v)}`)].filter(Boolean);
+    return lines.length ? { lines } : null; };
   return html`<div class="sheet">
     <section class="card span">
       <${Head} title="Traits" topic="traits" icon="dice" />
-      <div class="traits">${R.TRAITS.map(t => html`<div onMouseEnter=${e => tip.show(e.currentTarget, traitTip(t))} onMouseLeave=${() => tip.hide()}>
+      <div class="traits">${R.TRAITS.map(t => html`<div onMouseEnter=${e => { const b = traitTip(t); if (b) tip.show(e.currentTarget, b); }} onMouseLeave=${() => tip.hide()}>
         <${TraitShield} t=${t} value=${d.traits[t.k]} marked=${d.marked.has(t.k)} spell=${d.spellTraits.includes(t.k)}>
           ${edit && html`<${Stepper} label=${t.n} value=${c.traits[t.k]} onSet=${v => update(x => { x.traits[t.k] = v; addLog(x, `Free edit: ${t.n} → ${R.sign(v)}`); })} />`}
         </${TraitShield}></div>`)}</div>
@@ -652,8 +654,8 @@ function SheetTab({ c, d, update, edit }) {
     </section>
 
     <section class="card">
-      <${Head} title="Active weapons" topic="weapons" icon="weapon" />
-      <${WeaponLines} c=${c} d=${d} />
+      <${Head} title="Worn gear" topic="worn" icon="helm" />
+      <${WornGear} c=${c} d=${d} />
     </section>
 
     <section class="card span">
@@ -664,14 +666,31 @@ function SheetTab({ c, d, update, edit }) {
     ${death && html`<${DeathDialog} c=${c} d=${d} update=${update} onClose=${() => setDeath(false)} />`}
   </div>`;
 }
-// Weapon statistics as labelled cells (trait with your modifier, range, damage with Proficiency, burden).
+// Armor's numbers: thresholds and score, with how many slots are marked as a small banner under the score.
+function ArmorStats({ A, marked }) {
+  return html`<div class="statcells three"><div class="cell big"><small>Base Major</small><b>${A.major}</b></div><div class="cell big"><small>Base Severe</small><b>${A.severe}</b></div>
+    <div class="cell big"><small>Score</small><b>${A.score}</b>${marked != null && html`<em class=${marked ? "hit" : ""}>${marked ? `${marked} of ${A.score} marked` : "none marked"}</em>`}</div></div>`;
+}
+// Everything the character has on: equipped weapons, worn armor, and worn items. Equip and wear things on the Gear tab.
+function WornGear({ c, d }) {
+  const ws = R.equipped(c), a = d.armor, A = d.armorStats;
+  return html`<div class="wlines">
+    <${WeaponLines} c=${c} d=${d} />
+    ${a && A ? html`<div class="wline armorline"><div class="wn"><${Icon} n="helm" /><span class="wnm"><b>${R.gearName(a, A)}</b>${R.gearName(a, A) !== A.name && html`<small>${A.name}</small>`}</span><span class="tag">Armor</span></div>
+        <div class="statcells three"><div class="cell big"><small>Thresholds</small><b>${d.major} / ${d.severe}</b><em>with your level</em></div><div class="cell big"><small>Score</small><b>${d.armorScore}</b><em class=${d.cur.armor ? "hit" : ""}>${d.cur.armor ? `${d.cur.armor} of ${d.armorScore} marked` : "none marked"}</em></div></div>
+        ${A.feat && html`<${Md} cls="small" text=${A.feat} />`}</div>`
+      : html`<p class="muted small"><${Icon} n="helm" /> No armor: Armor Score 0, thresholds ${d.major} / ${d.severe}.</p>`}
+    ${d.worn.map(it => html`<div class="wline itemline"><div class="wn"><${Icon} n="pack" /><span class="wnm"><b>${it.name || "Item"}</b></span><span class="tag">Worn</span></div>${it.text && html`<${Md} cls="small" text=${it.text} />`}</div>`)}
+  </div>`;
+}
+// Weapon statistics as labelled cells (trait with your modifier, range, damage with Proficiency); burden as hands.
 function WeaponLines({ c, d }) {
   const ws = R.equipped(c);
-  if (!ws.length) return html`<p class="muted">No weapon equipped. Unarmed attacks use Strength or Finesse and deal ${d.prof}d4 damage. Equip weapons on the Gear tab.</p>`;
-  return html`<div class="wlines">${ws.map(w => { const W = R.weaponStats(w); if (!W) return null;
+  if (!ws.length) return html`<p class="muted small"><${Icon} n="weapon" /> No weapon equipped. Unarmed attacks use Strength or Finesse and deal ${d.prof}d4 damage.</p>`;
+  return html`${ws.map(w => { const W = R.weaponStats(w); if (!W) return null;
     const own = R.gearName(w, W) !== W.name;
     return html`<div class="wline"><div class="wn"><${Icon} n="weapon" /><span class="wnm"><b>${R.gearName(w, W)}</b>${own && html`<small>${W.name}</small>`}</span><span class="tag">${w.slot === "primary" ? "Primary" : "Secondary"}</span><${Burden} W=${W} /></div>
-      <${WeaponStats} W=${W} d=${d} />${W.feat && html`<${Md} cls="small" text=${W.feat} />`}</div>`; })}</div>`;
+      <${WeaponStats} W=${W} d=${d} />${W.feat && html`<${Md} cls="small" text=${W.feat} />`}</div>`; })}`;
 }
 const COND = ["Hidden", "Restrained", "Vulnerable"];
 function Conditions({ c, d, update }) {
@@ -971,7 +990,7 @@ function GearTab({ c, d, update, edit }) {
             <${Field} label="Severe" type="number" value=${a.severe} onInput=${v => update(x => { x.armor[i].severe = v; })} />
             <${Field} label="Score" type="number" value=${a.score} onInput=${v => update(x => { x.armor[i].score = v; })} />
             <${Field} label="Feature" value=${a.feat} onInput=${v => update(x => { x.armor[i].feat = v; })} /></div>`
-          : A && html`<div class="statcells"><div class="cell big"><small>Major</small><b>${A.major}</b></div><div class="cell big"><small>Severe</small><b>${A.severe}</b></div><div class="cell big"><small>Score</small><b>${A.score}</b></div><div class="cell"><small>Marked</small><b>${num(c.marks.armor[a.id])}</b></div></div>${A.feat && html`<${Md} cls="small" text=${A.feat} />`}`}
+          : A && html`<${ArmorStats} A=${A} marked=${num(c.marks.armor[a.id])} />${A.feat && html`<${Md} cls="small" text=${A.feat} />`}`}
         <div class="row"><button class=${"btn small" + (a.worn ? " on" : "")} onClick=${() => update(x => { x.armor.forEach((y, j) => { y.worn = j === i ? !y.worn : false; }); })}>${a.worn ? "Worn" : "Wear"}</button>
           <button class="btn small danger" onClick=${() => update(x => { x.armor.splice(i, 1); })}>Remove</button></div></div>`; })}</div>
       ${!c.armor.length && html`<p class="muted">Unarmored: Armor Score 0, Major threshold = level, Severe = twice your level.</p>`}
@@ -979,11 +998,12 @@ function GearTab({ c, d, update, edit }) {
 
     <section class="card">
       <${Head} title="Inventory" topic="inventory" icon="pack" tail=${html`<span class="row"><button class="btn small" onClick=${() => setIpick("item")}>+ Item</button><button class="btn small" onClick=${() => setIpick("consumable")}>+ Consumable</button></span>`} />
-      <div class="items">${c.items.map((it, i) => html`<div class="item">
+      <div class="items">${c.items.map((it, i) => html`<div class=${"item" + (it.worn ? " worn" : "")}>
         <${Icon} n=${it.kind === "consumable" ? "potion" : "pack"} cls="muted" />
         <input value=${it.name} aria-label="Item" onInput=${e => update(x => { x.items[i].name = e.target.value; })} />
         ${it.kind === "consumable" && html`<${Stepper} label="Quantity" value=${num(it.qty, 1)} min=${0} max=${R.MAX.consumable} onSet=${v => update(x => { x.items[i].qty = v; })} />`}
         ${it.text && html`<button class="iconbtn" aria-label="What it does" onClick=${() => openPanel({ title: it.name, sub: it.kind === "consumable" ? "Consumable" : "Item", body: html`<${Md} text=${it.text} />` })}>?</button>`}
+        ${it.kind !== "consumable" && html`<button class=${"btn tiny" + (it.worn ? " on" : "")} aria-pressed=${!!it.worn} title=${it.worn ? "Take it off" : "Wear or carry it ready: it shows under Worn gear on the sheet"} onClick=${() => update(x => { x.items[i].worn = !x.items[i].worn; })}>${it.worn ? "Worn" : "Equip"}</button>`}
         <button class="iconbtn" aria-label="Remove" onClick=${() => update(x => { x.items.splice(i, 1); })}>×</button></div>`)}</div>
       <p class="muted small">You can hold up to five of each consumable.</p>
     </section>
@@ -1118,11 +1138,10 @@ function TraitShield({ t, value, marked, spell, onClick, armed, pick, children }
   // Name and verbs sit in the shield's broad top; the value sits in its point, like a heraldic charge.
   return html`<div class="trait-col"><div class=${"trait-wrap" + (marked ? " marked" : "") + (pick ? " pick" : "") + (armed ? " armed" : "") + (spell ? " spell" : "")}>
     <${T} class="trait" type=${onClick ? "button" : undefined} onClick=${onClick}>
-      ${marked && html`<span class="tmark" title="Marked this tier">◆</span>`}
+      ${marked && html`<span class="tmark" title="Marked this tier">◆</span>`}${spell && html`<span class="tspell" aria-label="Spellcast trait"><${Icon} n="spellcast" /></span>`}
       <span class="ti"><${Icon} n=${t.k} /></span><span class="tn">${t.n}</span><span class="tverbs">${t.v}</span>
       <span class=${"tvb" + (spell ? " spell" : "") + (value != null && value < 0 ? " neg" : "")}>
-        ${spell ? html`<span class="tspell" aria-label="Spellcast trait"><${Icon} n="spellcast" /></span>`
-          : html`<svg class="tbadge" viewBox="0 0 64 74" aria-hidden="true"><path class="o" d="M3 3H61V33C61 52 47 64 32 71C17 64 3 52 3 33Z" /><path class="i" d="M9 9H55V33C55 48 44 58 32 64C20 58 9 48 9 33Z" /></svg>`}
+        <svg class="tbadge" viewBox="0 0 64 74" aria-hidden="true"><path class="o" d="M3 3H61V33C61 52 47 64 32 71C17 64 3 52 3 33Z" /><path class="i" d="M9 9H55V33C55 48 44 58 32 64C20 58 9 48 9 33Z" /></svg>
         <b class="tv">${value == null ? "?" : R.sign(value)}</b></span>
     </${T}></div>${children && html`<div class="trait-under">${children}</div>`}</div>`;
 }
@@ -1194,7 +1213,7 @@ function ItemCard({ x, kind, on, onPick, disabled, why }) {
   return html`<${T} class=${"item-card" + (on ? " on" : "")} disabled=${disabled} title=${why || ""} onClick=${onPick}>
     <span class="in"><${Icon} n=${kind === "weapon" ? "weapon" : kind === "armor" ? "helm" : kind === "consumable" ? "potion" : "pack"} />${x.name}${kind === "weapon" && html`<${Burden} W=${x} />`}</span>
     ${kind === "weapon" && html`<span class="small muted">${x.wheelchair ? "Combat wheelchair · " : ""}${x.cat} · Tier ${x.tier}</span><${WeaponStats} W=${x} />`}
-    ${kind === "armor" && html`<div class="statcells"><div class="cell big"><small>Major</small><b>${x.major}</b></div><div class="cell big"><small>Severe</small><b>${x.severe}</b></div><div class="cell big"><small>Score</small><b>${x.score}</b></div><div class="cell"><small>Tier</small><b>${x.tier}</b></div></div>`}
+    ${kind === "armor" && html`<span class="small muted">Tier ${x.tier}</span><${ArmorStats} A=${x} />`}
     ${(x.feat || x.x) && html`<${Md} cls="small" text=${x.feat || x.x} />`}
     ${why && html`<span class="small warn">${why}</span>`}</${T}>`;
 }
