@@ -11,7 +11,7 @@ const EXAMPLE_EXP = {
 const blankDraft = () => ({ step: 0, name: "", pronouns: "", campaign: "", emblem: { shape: "hope", hue: "#c9a227" }, portraitUrl: "", portraitData: "",
   cls: "", sub: "", ancestry: "", mixed: null, community: "", assign: {}, primary: "", secondary: "", armor: "", potion: "Minor Health Potion", classItem: "",
   answers: {}, description: "", exps: ["", ""], cards: [], connections: "" });
-const HUES = ["#c9a227", "#b23a3a", "#2f7d6d", "#3b6fb6", "#7b4bb0", "#c46a2b", "#6f7f3a", "#8a8a8a"];
+
 
 function Genesis({ onClose, onDone }) {
   const [g, setG] = useState(() => Object.assign(blankDraft(), lsGet("dh-genesis", {})));
@@ -55,7 +55,7 @@ function Genesis({ onClose, onDone }) {
   const last = g.step === 8;
   return html`<div class="genesis" role="dialog" aria-label="Character creation">
     <div class="g-top"><b>Character creation</b><span class="muted small">Step ${g.step + 1} of 9</span>
-      <button class="linkbtn small" onClick=${() => { if (confirm("Abandon this character and start over?")) { lsSet("dh-genesis", null); setG(blankDraft()); } }}>Start over</button>
+      <button class="linkbtn small" onClick=${async () => { if (await ask({ title: "Start over?", icon: "quill", danger: true, ok: "Start over", body: "This character is abandoned and creation begins again from the first step." })) { lsSet("dh-genesis", null); setG(blankDraft()); } }}>Start over</button>
       <button class="iconbtn" aria-label="Close" onClick=${onClose}>×</button></div>
     <ol class="g-rail">${G_STEPS.map((n, i) => html`<li class=${okStep(i) ? "done" : ""}><button class=${(i === g.step ? "on " : "") + (okStep(i) ? "ok" : "")} onClick=${() => go(i)} aria-label=${`Step ${i + 1}: ${n}`}>
       <span class="gem"><span>${okStep(i) && i !== g.step ? "✓" : i + 1}</span></span><span class="lbl">${n}</span></button></li>`)}</ol>

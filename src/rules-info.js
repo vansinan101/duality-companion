@@ -2,7 +2,8 @@
    Each topic: { title, sub, icon, flavor, parts, src }. Parts render as a visual breakdown (RuleTopic in app.js):
      "markdown"                         a paragraph (rule words become icon tokens)
      { h, i }                           a section heading with an icon medal
-     { facts: [[icon, label, md, hf?]] } tiles: icon, label, short text (hf: Hope & Fear only)
+     { facts: [[icon, label, md, hf?]] } tiles, for a few parallel things worth comparing at a glance (hf: Hope & Fear only)
+     { items: [[icon, label, md, hf?]] } a light icon list, for everything else: use tiles sparingly so they keep their weight
      { eq: [[kind, value, caption] | "op"] }  an equation of chips, e.g. d8+2 × 2 = 2d8+2
      { scale: [[label, sub, result]] }  a tiered bar, left to right, mildest first
      { gems: ["+2", …] }                small value gems
@@ -13,7 +14,7 @@
 const RULES_INFO = {
   traits: { title: "Traits", sub: "The six measures of your hero", icon: "dice", src: "Character Creation, step 3; Core Mechanics: Action Rolls; Leveling Up",
     flavor: "Six measures of what your hero can do, and how the dice lean when they try.", parts: [
-    { facts: [["agi", "Agility", "Sprint, Leap, Maneuver"], ["str", "Strength", "Lift, Smash, Grapple"], ["fin", "Finesse", "Control, Hide, Tinker"],
+    { items: [["agi", "Agility", "Sprint, Leap, Maneuver"], ["str", "Strength", "Lift, Smash, Grapple"], ["fin", "Finesse", "Control, Hide, Tinker"],
       ["ins", "Instinct", "Perceive, Sense, Navigate"], ["pre", "Presence", "Charm, Perform, Deceive"], ["kno", "Knowledge", "Recall, Analyze, Comprehend"]] },
     { h: "Rolling with a trait", i: "dice" },
     { eq: [["hope", "d12", "Hope Die"], "+", ["fear", "d12", "Fear Die"], "+", ["trait", "+2", "your trait"], "=", ["total", "Total", "vs the Difficulty"]] },
@@ -46,14 +47,14 @@ const RULES_INFO = {
     { scale: [["Minor", "below Major", "1 HP"], ["Major", "Major or more", "2 HP"], ["Severe", "Severe or more", "3 HP"]] },
     "Damage reduced to 0 marks nothing. Resistance halves the damage before you compare it to your thresholds. (Optional rule: twice your Severe threshold marks 4.)",
     { h: "Stress", i: "stress" },
-    { facts: [["stress", "Six to start", "Everyone begins with 6 Stress slots."], ["wound", "All marked", "You're *Vulnerable* until you clear one."], ["heart", "Can't mark it", "If you must mark Stress and can't, mark a Hit Point instead."]] },
+    "Everyone starts with **6** Stress slots. With all of them marked you're *Vulnerable* until you clear one, and if you must mark Stress and can't, you mark a Hit Point instead.",
     { h: "Hope", i: "hope" },
     "You start with **2 Hope** and can hold **6**. Spend it on:",
-    { facts: [["hope", "Help an Ally", "1 Hope: roll an advantage die for their action roll."], ["quill", "Use an Experience", "1 Hope each: add its modifier to a roll."],
+    { items: [["hope", "Help an Ally", "1 Hope: roll an advantage die for their action roll."], ["quill", "Use an Experience", "1 Hope each: add its modifier to a roll."],
       ["spotlight", "Tag Team Roll", "3 Hope, once per session: act together with another PC."], ["spell", "Hope features", "Your class's Hope feature, and other features that ask for it."]] },
     { h: "Death moves", i: "wound" },
     "When you mark your last Hit Point, choose one:",
-    { facts: [["crown", "Blaze of Glory", "One final action that critically succeeds, then you die."], ["rest", "Avoid Death", "Fall unconscious; roll your Hope Die, and at or below your level you gain a scar."],
+    { items: [["crown", "Blaze of Glory", "One final action that critically succeeds, then you die."], ["rest", "Avoid Death", "Fall unconscious; roll your Hope Die, and at or below your level you gain a scar."],
       ["dice", "Risk It All", "Roll the Duality Dice: Hope higher clears HP or Stress; Fear higher, you die; matching clears everything."]] },
     { note: "Left-click a box to mark up to it; right-click (or long-press on a phone) to clear back. \"Take damage\" works out the severity and marks the Hit Points for you; tick \"Mark an Armor Slot\" to use one." },
   ] },
@@ -65,7 +66,7 @@ const RULES_INFO = {
     { eq: [["hope", "1 Hope", "spend"], "→", ["trait", "+2", "add its modifier"]] },
     "Spend a Hope to add a relevant Experience to an action or reaction roll. You can spend more Hope to use several on one roll.",
     { h: "Gaining more", i: "crown" },
-    { facts: [["quill", "At creation", "Two Experiences at +2."], ["crown", "Levels 2, 5, 8", "A new Experience at +2 each time."]] },
+    { items: [["quill", "At creation", "Two Experiences at +2."], ["crown", "Levels 2, 5, 8", "A new Experience at +2 each time."]] },
     "An Experience can't be too broad (*Lucky*) or grant special powers (*Invulnerable*).",
   ] },
   weapons: { title: "Weapons", sub: "What you carry into the fight", icon: "weapon", src: "Equipment: Weapons",
@@ -79,12 +80,12 @@ const RULES_INFO = {
     { h: "Swapping", i: "stress" },
     "Swapping an inventory weapon for an equipped one is free during a rest or a moment of calm. In the thick of it, **mark a Stress**.",
     { h: "Limits", i: "spellcast" },
-    { facts: [["spellcast", "Magic weapons", "Need a Spellcast trait to wield."], ["crown", "Tier", "Nothing above your own tier."], ["str", "Unarmed", "Strength or Finesse; Proficiency × d4."]] },
+    { items: [["spellcast", "Magic weapons", "Need a Spellcast trait to wield."], ["crown", "Tier", "Nothing above your own tier."], ["str", "Unarmed", "Strength or Finesse; Proficiency × d4."]] },
   ] },
   conditions: { title: "Conditions", sub: "Effects that cling to a target", icon: "wound", src: "Core Mechanics: Conditions",
     flavor: "The marks a fight leaves on you: some help, most hinder, all of them matter.", parts: [
     { h: "Standard conditions", i: "wound" },
-    { facts: [["ins", "Hidden", "Out of sight of every enemy: rolls against you have disadvantage. Ends when they could see you, or you attack."],
+    { items: [["ins", "Hidden", "Out of sight of every enemy: rolls against you have disadvantage. Ends when they could see you, or you attack."],
       ["str", "Restrained", "You can't move, but can still act from where you are."], ["wound", "Vulnerable", "All rolls targeting you have advantage."]] },
     { h: "Special conditions", i: "spell" },
     "Features can apply their own conditions, such as *Asleep* or *Hexed*. They work as the feature says and end when it says they do.",
@@ -98,32 +99,31 @@ const RULES_INFO = {
     { eq: [["recall", "2", "Recall Cost"], "=", ["stress", "2 Stress", "to mark"]] },
     "During a rest, move cards freely. At any other time, bringing a card back from the vault costs Stress equal to its **Recall Cost**.",
     { h: "Gaining cards", i: "crown" },
-    { facts: [["quill", "At creation", "Two level 1 cards from your class's two domains."], ["crown", "Each level up", "One card at or below your new level."]] },
+    { items: [["quill", "At creation", "Two level 1 cards from your class's two domains."], ["crown", "Each level up", "One card at or below your new level."]] },
     "Subclass, ancestry, community and transformation cards never count toward your loadout.",
   ] },
   classes: { title: "Classes and subclasses", sub: "Your calling", icon: "crown", src: "Classes",
     flavor: "Your calling: the domains you draw on, and the feats only your class can do.", parts: [
-    { facts: [["spell", "Two domains", "Where your domain cards come from."], ["valor", "Evasion and HP", "Your starting numbers."], ["hope", "Hope feature", "Your class's signature move, for 3 Hope."]] },
+    { items: [["spell", "Two domains", "Where your domain cards come from."], ["valor", "Evasion and HP", "Your starting numbers."], ["hope", "Hope feature", "Your class's signature move, for 3 Hope."]] },
     { h: "Subclass", i: "foundation" },
     { facts: [["foundation", "Foundation", "Taken at creation. May give a Spellcast trait."], ["specialization", "Specialization", "From the upgraded subclass advancement."], ["mastery", "Mastery", "From that advancement again, later."]] },
     { note: "Features that say \"once per rest\", \"once per long rest\" or similar get use boxes; rests refresh them. Features that put tokens on their card get a token counter." },
   ] },
   heritage: { title: "Heritage", sub: "Ancestry and community", icon: "ancestry", src: "Ancestries; Communities; Transformations",
     flavor: "Who you were before the adventure: the blood you carry and the people who raised you.", parts: [
-    { facts: [["ancestry", "Ancestry", "Two features."], ["community", "Community", "One feature."], ["transformation", "Transformation", "Optional, given by the GM: a gift with a cost. Only one.", 1]] },
+    { items: [["ancestry", "Ancestry", "Two features."], ["community", "Community", "One feature."], ["transformation", "Transformation", "Optional, given by the GM: a gift with a cost. Only one.", 1]] },
     { h: "Mixed ancestry", i: "ancestry" },
     "Take the **first** feature of one ancestry and the **second** feature of another.",
   ] },
   armor: { title: "Armor", sub: "One suit at a time", icon: "helm", src: "Equipment: Armor; Core Mechanics: Downtime",
     flavor: "Leather, mail or plate: the armor that turns a killing blow into a bruise.", parts: [
-    { facts: [["heart", "Thresholds", "The armor's base Major and Severe, plus your level."], ["armor", "Armor Score", "The armor's base score: your number of Armor Slots."]] },
-    "Each armor tracks its own marked slots. You can't change armor while in danger.",
+    "Your damage thresholds are the armor's base Major and Severe numbers **plus your level**, and its base score is your number of Armor Slots. Each armor tracks its own marked slots, and you can't change armor while in danger.",
     { h: "Repairs", i: "rest" },
-    { facts: [["rest", "Short rest", "Repair Armor: clear 1d4 + your tier in slots."], ["longrest", "Long rest", "Repair All Armor: clear every slot."]] },
+    { items: [["rest", "Short rest", "Repair Armor: clear 1d4 + your tier in slots."], ["longrest", "Long rest", "Repair All Armor: clear every slot."]] },
   ] },
   inventory: { title: "Items and consumables", sub: "What's in the pack", icon: "pack", src: "Loot; Consumables",
     flavor: "Every adventurer's pack tells a story.", parts: [
-    { facts: [["pack", "Items", "Last until sold, lost or discarded."], ["potion", "Consumables", "Used once. Hold up to five of each."]] },
+    { items: [["pack", "Items", "Last until sold, lost or discarded."], ["potion", "Consumables", "Used once. Hold up to five of each."]] },
   ] },
   gold: { title: "Gold", sub: "Handfuls, bags and a chest", icon: "coins", src: "Gold",
     flavor: "Counted the adventurer's way: by the handful.", parts: [
@@ -137,7 +137,7 @@ const RULES_INFO = {
   ] },
   companion: { title: "Ranger companion", sub: "Beastbound", icon: "ranger", src: "Ranger: Beastbound, Ranger Companion",
     flavor: "A loyal beast at your side, as much a hero as you are.", parts: [
-    { facts: [["valor", "Evasion 10", "Its own Evasion."], ["quill", "Two Experiences", "Both at +2."], ["dice", "d6 attack", "Melee, physical or magic."]] },
+    { items: [["valor", "Evasion 10", "Its own Evasion."], ["quill", "Two Experiences", "Both at +2."], ["dice", "d6 attack", "Melee, physical or magic."]] },
     { steps: ["Command it with a **Spellcast Roll**; on a success its damage uses your Proficiency and its damage die.",
       "When it takes damage it marks a **Stress**. At its last Stress it leaves the scene until your next long rest.",
       "Each time you level up, choose one companion level-up option."] },
@@ -146,7 +146,7 @@ const RULES_INFO = {
   gmparty: { title: "The party", sub: "Fear and the table", icon: "fear", src: "Core Mechanics: Hope & Fear; Downtime",
     flavor: "Fear gathers in the dark between the heroes' rolls.", parts: [
     "The GM can hold up to **12 Fear**. The GM gains Fear:",
-    { facts: [["dice", "Roll with Fear", "1 Fear each time a player's action roll lands with Fear."], ["rest", "Short rest", "1d4 Fear."], ["longrest", "Long rest", "1d4 + the number of PCs."]] },
+    { items: [["dice", "Roll with Fear", "1 Fear each time a player's action roll lands with Fear."], ["rest", "Short rest", "1d4 Fear."], ["longrest", "Long rest", "1d4 + the number of PCs."]] },
     { note: "Rolls made with the app's Duality Dice add their Fear here automatically." },
   ] },
   spotlight: { title: "Spotlight tracker", sub: "Optional", icon: "spotlight", src: "Core Mechanics: Turn Order & Action Economy",
@@ -155,7 +155,7 @@ const RULES_INFO = {
   ] },
   adversaries: { title: "Adversaries", sub: "Foes on the table", icon: "foe", src: "Using Adversaries",
     flavor: "Every foe has a weakness and a breaking point.", parts: [
-    { facts: [["valor", "Difficulty", "The target number for attacks against it."], ["heart", "Thresholds and HP", "Damage marks HP by its thresholds, as for PCs."], ["stress", "Stress", "Spent on its features."]] },
+    { items: [["valor", "Difficulty", "The target number for attacks against it."], ["heart", "Thresholds and HP", "Damage marks HP by its thresholds, as for PCs."], ["stress", "Stress", "Spent on its features."]] },
   ] },
   countdowns: { title: "Countdowns", sub: "Trouble on the way", icon: "countdown", src: "Making Moves: Countdowns",
     flavor: "Something is coming. The only question is when.", parts: [
@@ -165,7 +165,7 @@ const RULES_INFO = {
     flavor: "The party grows together, milestone by milestone.", parts: [
     { steps: ["Take any **tier achievements**.", "Choose **two advancements**.", "Raise your **damage thresholds by 1**.", "Gain a **domain card** at your level or lower."] },
     { h: "Tier achievements", i: "crown" },
-    { facts: [["quill", "Levels 2, 5, 8", "A new Experience at +2, and +1 Proficiency."], ["crown", "Levels 5, 8", "Marked traits clear."]] },
+    { items: [["quill", "Levels 2, 5, 8", "A new Experience at +2, and +1 Proficiency."], ["crown", "Levels 5, 8", "Marked traits clear."]] },
     { note: "The number of slots each advancement has is printed on the character sheet, not in the SRD text. The app uses: traits 3, Hit Points 2, Stress 2, Experiences 1, domain card 1, Evasion 1, and from tier 3: subclass 1, Proficiency 1 (both picks), multiclass 1 (both picks). Check these against your printed sheets." },
   ] },
 };

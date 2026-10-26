@@ -33,8 +33,8 @@ function GMView({ chars, all, updateChar, openChar, openBooks }) {
   </section>`;
 }
 // End of session: Wither tokens become Fear (Witherwild), per-session uses refresh, spotlight tokens refill.
-function endSession(party, updateChar) {
-  if (!confirm("End the session? Per-session uses refresh" + (Store.state.frame === "witherwild" ? ", and Wither tokens on the PCs are cleared and become Fear." : "."))) return;
+async function endSession(party, updateChar) {
+  if (!(await ask({ title: "End the session?", icon: "session", ok: "End the session", body: "Per-session uses refresh and spotlight tokens refill" + (Store.state.frame === "witherwild" ? ". Wither tokens on the PCs are cleared and become Fear." : ".") }))) return;
   let wither = 0;
   party.forEach(c => { wither += num(c.wither); updateChar(c.id, x => { R.refreshUses(x, "session"); if (Store.state.frame === "witherwild" && num(x.wither)) { addLog(x, `End of session: ${x.wither} Wither tokens cleared`); x.wither = 0; } }); });
   Store.saveState(s => { s.fear = R.clamp(num(s.fear) + (s.frame === "witherwild" ? wither : 0), 0, R.MAX.fear); s.spotlight = Object.assign({}, s.spotlight, { left: {} }); });
@@ -99,7 +99,7 @@ function Foes({ st, save }) {
           <button class="btn tiny" onClick=${() => openPanel({ title: a.name, sub: `Tier ${a.tier} ${a.type}`, body: html`<${StatBlock} a=${a} />` })}>Stat block</button></span></div>`} />`}
     <div class="foes">${foes.map(f => html`<${FoeCard} key=${f.id} f=${f} setFoe=${setFoe} save=${save} />`)}</div>
     ${!foes.length && html`<p class="muted small">No adversaries in the scene.</p>`}
-    ${foes.length > 0 && html`<div class="row"><button class="btn small danger" onClick=${() => confirm("Clear every adversary from the scene?") && save(s => { s.foes = []; })}>Clear the scene</button></div>`}
+    ${foes.length > 0 && html`<div class="row"><button class="btn small danger" onClick=${async () => (await ask({ title: "Clear the scene?", icon: "foe", danger: true, ok: "Clear every adversary", body: "Every adversary is removed from the scene." })) && save(s => { s.foes = []; })}>Clear the scene</button></div>`}
     <${Head} level=${3} title="Environment" />
     <div class="row wrapr"><${Select} label="Environment" value=${st.env} empty="None" options=${[1, 2, 3, 4].map(t => ({ group: "Tier " + t, items: R.list("environments").filter(e => e.tier === t).map(e => [e.name, `${e.name} (${e.type})`]) }))} onChange=${v => save(s => { s.env = v; })} /></div>
     ${env && html`<div class="statblock"><p><i>${env.desc}</i></p><p class="small"><b>Impulses:</b> ${env.impulses} · <b>Difficulty:</b> ${env.diff}${env.potential ? html` · <b>Potential adversaries:</b> ${env.potential}` : ""}</p>
@@ -157,7 +157,7 @@ function Players({ chars, updateChar }) {
     <div class="members">${ms.map(m => html`<div class="member"><b>${m.name}</b><span class="tag">${m.role === "gm" ? "GM" : "Player"}</span>
       <span class="small muted">${mine(m.uid).map(c => c.name).join(", ") || "No characters"}</span>
       ${m.uid !== Store.table.uid && html`<span class="row"><button class="btn tiny" onClick=${() => Store.table.setRole(m.uid, m.role === "gm" ? "player" : "gm")}>${m.role === "gm" ? "Make player" : "Make GM"}</button>
-        <button class="btn tiny danger" onClick=${() => confirm(`Remove ${m.name} from the table?`) && Store.table.remove(m.uid)}>Remove</button></span>`}
+        <button class="btn tiny danger" onClick=${async () => (await ask({ title: `Remove ${m.name}?`, icon: "community", danger: true, ok: "Remove from the table", body: `${m.name} loses access to this table. Their characters stay.` })) && Store.table.remove(m.uid)}>Remove</button></span>`}
       <${Select} label="Give a character" value="" empty="—" options=${chars.filter(c => !c.companionOf && !playersOf(c).includes(m.uid)).map(c => [c.id, c.name || "Unnamed"])}
         onChange=${id => id && updateChar(id, x => { x.players = playersOf(x).concat(m.uid); chars.filter(k => k.companionOf === id).forEach(k => updateChar(k.id, y => { y.players = playersOf(y).concat(m.uid); })); })} />
       ${mine(m.uid).map(c => html`<button class="chip on" title="Take this character back" onClick=${() => updateChar(c.id, x => { x.players = playersOf(x).filter(u => u !== m.uid); })}>${c.name} ×</button>`)}
@@ -172,7 +172,7 @@ function Backup({ chars }) {
   const restore = async f => {
     try {
       const b = JSON.parse(await f.text()); if (!b.dhBackup) throw 0;
-      if (!confirm(`Restore ${b.characters.length} characters into this table? Characters with the same id are replaced.`)) return;
+      if (!(await ask({ title: "Restore the backup?", icon: "book", ok: "Restore", body: `${b.characters.length} characters are restored into this table. Characters already here with the same id are replaced.` }))) return;
       for (const c of b.characters) { const p = b.portraits && b.portraits[c.portraitAsset]; if (p) { c.portraitData = p; c.portraitAsset = ""; } await Store.flush(c); }
       if (b.state) Store.saveState(s => Object.assign(s, b.state));
       toast("Backup restored.");

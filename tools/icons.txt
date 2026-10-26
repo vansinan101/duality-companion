@@ -62,3 +62,4 @@ tokens = lorc/rune-stone
 potion = caro-asercion/round-potion
 book = lorc/bookmarklet
 crown = lorc/laurel-crown
+hand = lorc/hand
