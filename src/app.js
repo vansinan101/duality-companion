@@ -673,7 +673,7 @@ function ArmorStats({ A, marked }) {
 }
 // Everything the character has on: equipped weapons, worn armor, and worn items. Equip and wear things on the Gear tab.
 function WornGear({ c, d }) {
-  const ws = R.equipped(c), a = d.armor, A = d.armorStats;
+  const a = d.armor, A = d.armorStats;
   return html`<div class="wlines">
     <${WeaponLines} c=${c} d=${d} />
     ${a && A ? html`<div class="wline armorline"><div class="wn"><${Icon} n="helm" /><span class="wnm"><b>${R.gearName(a, A)}</b>${R.gearName(a, A) !== A.name && html`<small>${A.name}</small>`}</span><span class="tag">Armor</span></div>
@@ -912,10 +912,23 @@ function DomainCard({ name, onMove, moveLabel, onRemove, picked, onPick, vaulted
       <span class="dc-rec" title=${`Recall cost: mark ${x.recall} Stress to bring this card back from the vault outside a rest`}>${BOLT}${x.recall}</span></div>
     <span class="dc-medal" title=${`${x.dom} domain`}><${Icon} n=${ic} /></span>
     <div class="dc-body"><span class="dc-type"><${Icon} n=${x.type.toLowerCase()} />${x.type}</span>
-      <h4 class="dc-name">${x.name}</h4><${Md} cls="dc-x" text=${x.x} />
+      <h4 class="dc-name">${x.name}</h4>${x.type === "Grimoire" ? html`<${Tome} text=${x.x} />` : html`<${Md} cls="dc-x" text=${x.x} />`}
       ${(onMove || onRemove || onPick) && html`<div class="dc-foot">${onPick && html`<button class=${"btn small" + (picked ? " gold" : " primary")} onClick=${onPick}>${picked ? "✓ Chosen" : "Choose"}</button>`}
         ${onMove && html`<button class="btn small" onClick=${onMove}>${moveLabel}</button>`}${onRemove && html`<button class="btn small danger" onClick=${onRemove}>Remove</button>`}</div>`}
     </div><i class="dc-wm"><${Icon} n=${ic} /></i></article>`;
+}
+// A grimoire holds several spells: shown as a small tome, one spell per page, with ribbon bookmarks and page turns.
+function Tome({ text }) {
+  const pages = String(text || "").split(/\n\s*\n/).map(p => { const m = /^\*{2,3}_?([^*_:]+):_?\*{2,3}\s*/.exec(p.trim()); return m ? { n: m[1].trim(), x: p.trim().slice(m[0].length) } : { n: "", x: p.trim() }; }).filter(p => p.x);
+  const [i, setI] = useState(0);
+  if (pages.length < 2) return html`<${Md} cls="dc-x" text=${text} />`;
+  const p = pages[Math.min(i, pages.length - 1)];
+  return html`<div class="tome">
+    <div class="tome-tabs" role="tablist">${pages.map((q, k) => html`<button role="tab" aria-selected=${k === i} class=${"tome-tab" + (k === i ? " on" : "")} onClick=${() => setI(k)}>${q.n || `Page ${k + 1}`}</button>`)}</div>
+    <div class="tome-page" key=${i}><h5 class="tome-spell">${p.n}</h5><${Md} cls="dc-x" text=${p.x} /></div>
+    <div class="tome-nav"><button class="tome-turn" aria-label="Previous spell" disabled=${i === 0} onClick=${() => setI(i - 1)}>◀</button>
+      <span>${i + 1} of ${pages.length}</span><button class="tome-turn" aria-label="Next spell" disabled=${i >= pages.length - 1} onClick=${() => setI(i + 1)}>▶</button></div>
+  </div>`;
 }
 function CardPicker({ c, onClose, onPick, forLevel, maxLevel, title = "Add a domain card", exclude = [] }) {
   const [dom, setDom] = useState("");
@@ -959,6 +972,15 @@ function GearTab({ c, d, update, edit }) {
   const g = c.gold;
   const addGold = (k, n) => update(x => { const unit = { coins: 1, handfuls: 10, bags: 100, chests: 1000 }[k]; const t = R.goldTotal(x.gold) + n * unit; if (t > 1999 && n > 0 && k !== "coins") toast("You can't hold more than one chest. Spend some, or store it somewhere."); x.gold = R.goldFrom(R.clamp(t, 0, 1999), x.useCoins); });
   return html`<div class="gear">
+    <section class="card purse">
+      <${Head} title="Gold" topic="gold" icon="coins" tail=${html`<span class="purse-sum">${[["chests", "chest"], ["bags", "bag"], ["handfuls", "handful"], ...(c.useCoins ? [["coins", "coin"]] : [])].filter(([k]) => num(g[k])).map(([k, n]) => `${num(g[k])} ${n}${num(g[k]) > 1 ? "s" : ""}`).join(" · ") || "Empty purse"}</span>`} />
+      <div class="gold">${[["handfuls", "Handfuls", 9], ["bags", "Bags", 9], ["chests", "Chest", 1]].map(([k, n, m]) => html`<div class="gk"><span>${n}</span>
+        <${Track} label=${n} value=${num(g[k])} max=${m} kind="gold" verb=${["Gain", "Spend"]} onSet=${v => update(x => { x.gold[k] = v; })} />
+        <span class="row"><button class="btn tiny" onClick=${() => addGold(k, -1)}>−1</button><button class="btn tiny" onClick=${() => addGold(k, 1)}>+1</button></span></div>`)}
+        ${c.useCoins && html`<div class="gk"><span>Coins</span><${Stepper} label="Coins" value=${num(g.coins)} min=${0} max=${9} onSet=${v => update(x => { x.gold.coins = v; })} /></div>`}
+      </div>
+      <label class="chk small"><input type="checkbox" checked=${!!c.useCoins} onChange=${e => update(x => { x.useCoins = e.target.checked; })} /> Track coins too (optional rule: 10 coins = 1 handful)</label>
+    </section>
     <section class="card">
       <${Head} title="Weapons" topic="weapons" icon="weapon" tail=${html`<button class="btn small" onClick=${() => setWpick("pack")}>+ Weapon</button>`} />
       ${burdenWarn && html`<p class="warn">${burdenWarn}</p>`}
@@ -1008,15 +1030,7 @@ function GearTab({ c, d, update, edit }) {
       <p class="muted small">You can hold up to five of each consumable.</p>
     </section>
 
-    <section class="card">
-      <${Head} title="Gold" topic="gold" icon="coins" />
-      <div class="gold">${[["handfuls", "Handfuls", 9], ["bags", "Bags", 9], ["chests", "Chest", 1]].map(([k, n, m]) => html`<div class="gk"><span>${n}</span>
-        <${Track} label=${n} value=${num(g[k])} max=${m} kind="gold" verb=${["Gain", "Spend"]} onSet=${v => update(x => { x.gold[k] = v; })} />
-        <span class="row"><button class="btn tiny" onClick=${() => addGold(k, -1)}>−1</button><button class="btn tiny" onClick=${() => addGold(k, 1)}>+1</button></span></div>`)}
-        ${c.useCoins && html`<div class="gk"><span>Coins</span><${Stepper} label="Coins" value=${num(g.coins)} min=${0} max=${9} onSet=${v => update(x => { x.gold.coins = v; })} /></div>`}
-      </div>
-      <label class="chk small"><input type="checkbox" checked=${!!c.useCoins} onChange=${e => update(x => { x.useCoins = e.target.checked; })} /> Track coins too (optional rule: 10 coins = 1 handful)</label>
-    </section>
+    
     ${wpick && html`<${GearPicker} kind="weapon" c=${c} d=${d} onClose=${() => setWpick(null)} onPick=${(name, custom) => { update(x => { x.weapons.push(custom ? { id: rid("w"), custom: true, name: "Custom weapon", trait: "Strength", range: "Melee", dmg: "d8 phy", burden: "One-Handed", feat: "", slot: "pack" } : { id: rid("w"), name, slot: "pack" }); }); setWpick(null); }} />`}
     ${apick && html`<${GearPicker} kind="armor" c=${c} d=${d} onClose=${() => setApick(false)} onPick=${(name, custom) => { update(x => { x.armor.push(custom ? { id: rid("a"), custom: true, name: "Custom armor", major: 5, severe: 11, score: 3, feat: "", worn: !x.armor.length } : { id: rid("a"), name, worn: !x.armor.length }); }); setApick(false); }} />`}
     ${ipick && html`<${GearPicker} kind=${ipick} c=${c} d=${d} onClose=${() => setIpick(null)} onPick=${(name, custom, text) => { update(x => { x.items.push({ id: rid("i"), name: custom ? "" : name, qty: 1, kind: ipick, text: text || "" }); }); setIpick(null); }} />`}
