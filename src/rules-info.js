@@ -2,7 +2,7 @@
    Each topic: { title, sub, icon, flavor, parts, src }. Parts render as a visual breakdown (RuleTopic in app.js):
      "markdown"                         a paragraph (rule words become icon tokens)
      { h, i }                           a section heading with an icon medal
-     { facts: [[icon, label, md, hf?]] } tiles, for a few parallel things worth comparing at a glance (hf: Hope & Fear only)
+     { items: [[icon, label, md, hf?]] } tiles, for a few parallel things worth comparing at a glance (hf: Hope & Fear only)
      { items: [[icon, label, md, hf?]] } a light icon list, for everything else: use tiles sparingly so they keep their weight
      { eq: [[kind, value, caption] | "op"] }  an equation of chips, e.g. d8+2 × 2 = 2d8+2
      { scale: [[label, sub, result]] }  a tiered bar, left to right, mildest first
@@ -30,7 +30,7 @@ const RULES_INFO = {
   ] },
   defense: { title: "Evasion, armor and thresholds", sub: "How hard you are to hit and to hurt", icon: "valor", src: "Core Mechanics: Combat; Equipment: Armor",
     flavor: "What stands between you and the blow: how hard you are to hit, and how much you can shrug off.", parts: [
-    { facts: [["valor", "Evasion", "The Difficulty of any roll made against you. Starts at your class's number; armor, cards and advancements change it."],
+    { items: [["valor", "Evasion", "The Difficulty of any roll made against you. Starts at your class's number; armor, cards and advancements change it."],
       ["armor", "Armor Score", "How many Armor Slots your worn armor gives you, never above 12."],
       ["dice", "Proficiency", "How many damage dice your weapons roll. Starts at 1; rises at levels 2, 5 and 8."]] },
     { h: "Damage thresholds", i: "heart" },
@@ -72,7 +72,7 @@ const RULES_INFO = {
   weapons: { title: "Weapons", sub: "What you carry into the fight", icon: "weapon", src: "Equipment: Weapons",
     flavor: "Steel, spellwork or something stranger: what you carry into the fight, and how hard it lands.", parts: [
     { h: "Hands and burden", i: "weapon" },
-    { facts: [["weapon", "Primary", "Your main weapon. One equipped at a time."], ["blade", "Secondary", "An off-hand weapon or shield. One at a time."], ["pack", "Inventory", "Up to two more, carried but not in hand."]] },
+    { items: [["weapon", "Primary", "Your main weapon. One equipped at a time."], ["blade", "Secondary", "An off-hand weapon or shield. One at a time."], ["pack", "Inventory", "Up to two more, carried but not in hand."]] },
     "Together, your equipped weapons can use at most **two hands** of burden.",
     { h: "Damage", i: "dice" },
     { eq: [["dice", "d8+2", "weapon damage"], "×", ["prof", "2", "Proficiency"], "=", ["dice", "2d8+2", "you roll"]] },
@@ -81,6 +81,12 @@ const RULES_INFO = {
     "Swapping an inventory weapon for an equipped one is free during a rest or a moment of calm. In the thick of it, **mark a Stress**.",
     { h: "Limits", i: "spellcast" },
     { items: [["spellcast", "Magic weapons", "Need a Spellcast trait to wield."], ["crown", "Tier", "Nothing above your own tier."], ["str", "Unarmed", "Strength or Finesse; Proficiency × d4."]] },
+  ] },
+  worn: { title: "Worn gear", sub: "What you have on", icon: "helm", src: "Equipment; Loot",
+    flavor: "Everything you carry into danger, ready to hand.", parts: [
+    { items: [["weapon", "Weapons", "One primary and one secondary, within two hands of burden."], ["helm", "Armor", "One suit at a time: its thresholds plus your level, and its Armor Slots."],
+      ["pack", "Worn items", "Rings, amulets and other loot you have on. Mark them with **Equip** in your inventory."]] },
+    "Equip weapons, wear armor and equip items on the **Gear** tab; they appear here.",
   ] },
   conditions: { title: "Conditions", sub: "Effects that cling to a target", icon: "wound", src: "Core Mechanics: Conditions",
     flavor: "The marks a fight leaves on you: some help, most hinder, all of them matter.", parts: [
@@ -94,7 +100,7 @@ const RULES_INFO = {
   ] },
   loadout: { title: "Domain cards", sub: "Loadout and vault", icon: "spell", src: "Domains: Loadout & Vault",
     flavor: "Your hand of power: the cards you can call on now, and the ones waiting in the vault.", parts: [
-    { facts: [["spell", "Loadout", "Up to **5** active cards you can use."], ["book", "Vault", "The rest: kept, but out of reach until recalled."]] },
+    { items: [["spell", "Loadout", "Up to **5** active cards you can use."], ["book", "Vault", "The rest: kept, but out of reach until recalled."]] },
     { h: "Recalling a card", i: "recall" },
     { eq: [["recall", "2", "Recall Cost"], "=", ["stress", "2 Stress", "to mark"]] },
     "During a rest, move cards freely. At any other time, bringing a card back from the vault costs Stress equal to its **Recall Cost**.",
@@ -106,7 +112,7 @@ const RULES_INFO = {
     flavor: "Your calling: the domains you draw on, and the feats only your class can do.", parts: [
     { items: [["spell", "Two domains", "Where your domain cards come from."], ["valor", "Evasion and HP", "Your starting numbers."], ["hope", "Hope feature", "Your class's signature move, for 3 Hope."]] },
     { h: "Subclass", i: "foundation" },
-    { facts: [["foundation", "Foundation", "Taken at creation. May give a Spellcast trait."], ["specialization", "Specialization", "From the upgraded subclass advancement."], ["mastery", "Mastery", "From that advancement again, later."]] },
+    { items: [["foundation", "Foundation", "Taken at creation. May give a Spellcast trait."], ["specialization", "Specialization", "From the upgraded subclass advancement."], ["mastery", "Mastery", "From that advancement again, later."]] },
     { note: "Features that say \"once per rest\", \"once per long rest\" or similar get use boxes; rests refresh them. Features that put tokens on their card get a token counter." },
   ] },
   heritage: { title: "Heritage", sub: "Ancestry and community", icon: "ancestry", src: "Ancestries; Communities; Transformations",

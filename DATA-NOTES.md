@@ -34,3 +34,8 @@
 | GM table: party, initiative deck, backups | Fear tracker, party cards, spotlight tokens (optional rule), SRD adversaries and environments, countdowns, Witherwild Wither tokens, backups |
 | Tabletop tab (TTS code) | Data tab: save/load a character file |
 | Themes | Not yet (plain starter look) — last phase |
+
+## App readings added 2026-10-25
+- **Mage Robes (Enchanted):** "a bonus to your damage thresholds equal to your Spellcast trait": with no Spellcast trait, or a negative one, the app adds 0.
+- **Rune-Forged Exosuit (Attuned):** the threshold bonus equal to your tier is applied; the smaller loadout (one fewer card) isn't enforced yet.
+- **Relics:** a worn relic's "+1 bonus to your <trait>" is applied. The Honing Relic (an Experience of your choice) isn't applied automatically; use Free edit.
