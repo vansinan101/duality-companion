@@ -230,6 +230,7 @@ function RuleTopic({ info }) {
     ${(info.parts || []).map(part => typeof part === "string" ? html`<${Md} cls="rp-p" text=${part} />`
       : part.h ? html`<div class="rp-h"><span class="hmedal"><${Icon} n=${part.i || "book"} /></span><span>${part.h}</span><i class="rule"></i></div>`
       : part.facts ? html`<div class="rp-facts">${part.facts.filter(f => !f[3] || hf).map(([i, l, x]) => html`<div class="rp-fact"><span class="rp-fi"><${Icon} n=${i} /></span><div><b>${l}</b><${Md} text=${x} /></div></div>`)}</div>`
+      : part.items ? html`<ul class="rp-items">${part.items.filter(f => !f[3] || hf).map(([i, l, x]) => html`<li><${Icon} n=${i} /><div><b>${l}</b> <${Md} cls="inl" text=${x} /></div></li>`)}</ul>`
       : part.eq ? html`<div class="rp-eq">${part.eq.reduce((o, x, i, a) => (typeof a[i - 1] === "string" && i > 0 ? o : o.concat(typeof x === "string" && a[i + 1] ? html`<span class="eq-g">${chip(x)}${chip(a[i + 1])}</span>` : chip(x))), [])}</div>`
       : part.scale ? html`<div class="rp-scale">${part.scale.map(([l, sub, r], k) => html`<div class=${"rs rs" + (k + 1)}><b>${l}</b><small>${sub}</small><span>${r}</span></div>`)}</div>`
       : part.gems ? html`<div class="rp-gems">${part.gems.map(g => html`<span class=${"val mini " + (g in GEM ? GEM[g] : "vn")}>${g}</span>`)}</div>`
@@ -275,9 +276,9 @@ function Select({ label, value, onChange, options, empty }) {
 function Stepper({ value, onSet, min = -99, max = 99, label }) {
   return html`<span class="stepper" role="group" aria-label=${label}><button type="button" aria-label=${`Lower ${label}`} onClick=${() => onSet(Math.max(min, num(value) - 1))}>−</button><b>${value}</b><button type="button" aria-label=${`Raise ${label}`} onClick=${() => onSet(Math.min(max, num(value) + 1))}>+</button></span>`;
 }
-function Modal({ title, onClose, children, wide, foot }) {
+function Modal({ title, onClose, children, wide, foot, top }) {
   useEffect(() => { const k = e => e.key === "Escape" && onClose(); window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, []);
-  return html`<div class="modal-back" onClick=${e => e.target === e.currentTarget && onClose()}><div class=${"modal" + (wide ? " wide" : "")} role="dialog" aria-label=${title}>
+  return html`<div class=${"modal-back" + (top ? " top" : "")} onClick=${e => e.target === e.currentTarget && onClose()}><div class=${"modal" + (wide ? " wide" : "")} role="dialog" aria-label=${title}>
     <div class="m-head"><b>${title}</b><button class="iconbtn" aria-label="Close" onClick=${onClose}>×</button></div>
     <div class="m-body">${children}</div>${foot && html`<div class="m-foot">${foot}</div>`}</div></div>`;
 }
@@ -331,6 +332,19 @@ function Asker() {
     <form class="row" onSubmit=${e => { e.preventDefault(); if (v !== "") done(v); }}>
       <input class="bignum" type="number" inputmode="numeric" autofocus value=${v} onInput=${e => setV(e.target.value)} aria-label="Total rolled" />
       <button class="btn primary" type="submit">Use it</button><button class="btn" type="button" onClick=${() => { const r = R.roll(q.expr); done(r ? r.total : 0); }}>Let the app roll</button></form></${Modal}>`;
+}
+// The app's own "are you sure?" window, in place of the browser's pop-up. ask({ title, body, ok, danger, icon }) → true / false.
+let confirmFn = () => Promise.resolve(false);
+const ask = o => confirmFn(typeof o === "string" ? { body: o } : o);
+function Confirmer() {
+  const [q, setQ] = useState(null);
+  confirmFn = o => new Promise(res => setQ(Object.assign({ res }, o)));
+  useEffect(() => { if (!q) return; const k = e => { if (e.key === "Enter") { e.preventDefault(); done(true); } }; window.addEventListener("keydown", k); return () => window.removeEventListener("keydown", k); }, [q]);
+  if (!q) return null;
+  const done = v => { q.res(v); setQ(null); };
+  return html`<${Modal} top title=${q.title || "Are you sure?"} onClose=${() => done(false)}
+    foot=${html`<button class="btn" onClick=${() => done(false)}>${q.no || "Cancel"}</button><button class=${"btn " + (q.danger ? "danger solid" : "primary")} onClick=${() => done(true)}>${q.ok || "Yes"}</button>`}>
+    <div class="confirm">${q.icon && html`<span class=${"sp-medal" + (q.danger ? " danger" : "")}><${Icon} n=${q.icon} /></span>`}<div class="confirm-b">${typeof q.body === "string" ? html`<p>${q.body}</p>` : q.body}</div></div></${Modal}>`;
 }
 function DiceSwitch() {
   const [m, setM] = useState(lsGet("dh-dice", "app"));
@@ -414,7 +428,7 @@ function App() {
     ${about && html`<${About} onClose=${() => setAbout(false)} />`}
     ${books && html`<${Books} first=${books === "first"} onClose=${() => setBooks(false)} />`}
     <${DiceDock} c=${view === "chars" ? current : null} update=${update} />
-    <${Toaster} /><${HoverCard} /><${SidePanel} /><${Asker} />
+    <${Toaster} /><${HoverCard} /><${SidePanel} /><${Asker} /><${Confirmer} />
   </div>`;
 }
 
@@ -497,26 +511,50 @@ function Character({ c, all, update, tab, setTab, onDelete }) {
     ${lvl && html`<${LevelUp} c=${c} d=${d} update=${update} onClose=${() => setLvl(false)} />`}
   </section>`;
 }
-function Header({ c, d, update, edit, setEdit, onLevel }) {
+// The likeness window (as in character creation): an emblem and its colour, initials, an image link, or an uploaded picture.
+const HUES = ["#c9a227", "#b23a3a", "#2f7d6d", "#3b6fb6", "#7b4bb0", "#c46a2b", "#6f7f3a", "#8a8a8a"];
+function Likeness({ c, update, onClose }) {
   const fileRef = useRef();
+  const em = Object.assign({ shape: "", hue: "#c9a227" }, c.emblem);
+  const dropPicture = x => { if (x.portraitAsset && Store.assets && Store.assets.remove) Store.assets.remove(x.portraitAsset); x.portraitAsset = ""; x.portraitData = ""; x.portraitUrl = ""; };
+  const setEmblem = e => update(x => { dropPicture(x); x.emblem = e; });
   const upload = async f => {
     if (!f) return;
     try {
-      if (Store.assets && Store.assets.upload) { const r = await Store.assets.upload(f, c.portraitAsset); update(x => { x.portraitAsset = r.id; x.portraitData = ""; }); }
-      else { const data = await shrinkImage(f); update(x => { x.portraitData = data; x.portraitAsset = ""; }); }
+      if (Store.assets && Store.assets.upload) { const r = await Store.assets.upload(f, c.portraitAsset); update(x => { x.portraitAsset = r.id; x.portraitData = ""; x.portraitUrl = ""; }); }
+      else { const data = await shrinkImage(f); update(x => { x.portraitData = data; x.portraitAsset = ""; x.portraitUrl = ""; }); }
     } catch { toast("Couldn't use that picture. Try a smaller image."); }
   };
+  const pic = !!portraitSrc(c);
+  return html`<${Modal} title="Likeness" onClose=${onClose} wide foot=${html`<button class="btn primary" onClick=${onClose}>Done</button>`}>
+    <div class="likeness big">
+      <div class="lk-prev"><span class="portrait still"><${Face} c=${c} /></span><b>${c.name || "Unnamed"}</b></div>
+      <div class="lk-opts">
+        <div class="lk-sec"><h5>Emblem</h5>
+          <div class="chips"><button class=${"chip emb init" + (!pic && !em.shape ? " on" : "")} aria-label="Initials" title="Initials" onClick=${() => setEmblem(null)}>${initials(c.name)}</button>
+            ${EMBLEMS.map(s => html`<button class=${"chip emb" + (!pic && em.shape === s ? " on" : "")} aria-label=${s} onClick=${() => setEmblem({ shape: s, hue: em.hue })}><${Emblem} shape=${s} hue=${em.hue} /></button>`)}</div>
+          <div class="chips">${HUES.map(hh => html`<button class=${"swatch" + (em.hue === hh ? " on" : "")} style=${`background:${hh}`} aria-label=${"Colour " + hh} onClick=${() => setEmblem({ shape: em.shape || "hope", hue: hh })}></button>`)}
+            <input type="color" value=${em.hue} aria-label="Any colour" onInput=${e => setEmblem({ shape: em.shape || "hope", hue: e.target.value })} /></div></div>
+        <div class="lk-sec"><h5>Picture</h5>
+          <div class="row"><button class="btn" onClick=${() => fileRef.current.click()}><${Icon} n="pack" />Upload a file</button>
+            ${pic && html`<button class="btn danger" onClick=${() => update(dropPicture)}>Remove picture</button>`}</div>
+          <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${e => upload(e.target.files[0])} />
+          <${Field} label="Or an image link" value=${c.portraitUrl} placeholder="https://…" onInput=${v => update(x => { if (x.portraitAsset && Store.assets && Store.assets.remove) Store.assets.remove(x.portraitAsset); x.portraitAsset = ""; x.portraitData = ""; x.portraitUrl = v; })} /></div>
+      </div></div></${Modal}>`;
+}
+function Header({ c, d, update, edit, setEdit, onLevel }) {
+  const [like, setLike] = useState(false);
   const her = [c.ancestry || (c.mixed && "Mixed ancestry"), c.community].filter(Boolean).join(" · ");
   return html`<div class="head card">
-    <button type="button" class="portrait" aria-label="Change portrait" onClick=${() => fileRef.current.click()}><${Face} c=${c} /></button>
-    <input ref=${fileRef} type="file" accept="image/*" hidden onChange=${e => upload(e.target.files[0])} />
+    <button type="button" class="portrait" aria-label="Change portrait" onClick=${() => setLike(true)}><${Face} c=${c} /><span class="pedit"><${Icon} n="quill" /></span></button>
+    ${like && html`<${Likeness} c=${c} update=${update} onClose=${() => setLike(false)} />`}
     <div class="hmain">
       <input class="cname" value=${c.name} aria-label="Character name" placeholder="Name" onInput=${e => update(x => { x.name = e.target.value; })} />
       <div class="hline">${c.cls ? html`<${Icon} n=${clsIcon(c.cls)} />${c.cls}${c.sub ? html` · ${c.sub}` : ""}` : "No class yet"}${her && html`<span class="muted">· ${her}</span>`}${c.pronouns && html`<span class="muted">· ${c.pronouns}</span>`}</div>
       <div class="hmeta">
         <span class="lvl" title="Level and tier"><b>${c.level}</b>Level · Tier ${d.tier}</span>
         ${c.level < 10 && html`<button class="btn small primary" onClick=${onLevel}><${Icon} n="crown" />Level up</button>`}
-        ${c.levelups.length > 0 && html`<button class="btn small" onClick=${() => { if (confirm(`Undo the level ${c.level} level-up?`)) update(x => { R.undoLevelUp(x); addLog(x, `Undid level ${c.level}`); }); }}>Undo level ${c.level}</button>`}
+        ${c.levelups.length > 0 && html`<button class="btn small" onClick=${async () => { if (await ask({ title: `Undo level ${c.level}?`, icon: "crown", ok: `Undo level ${c.level}`, body: `Everything chosen at level ${c.level} is taken back and ${c.name || "this character"} returns to level ${c.level - 1}.` })) update(x => { R.undoLevelUp(x); addLog(x, `Undid level ${c.level}`); }); }}>Undo level ${c.level}</button>`}
         ${canFree(c) && html`<button class=${"btn small" + (edit ? " on" : "")} aria-pressed=${edit} onClick=${() => setEdit(!edit)}>${edit ? "Done editing" : "Free edit"}</button>`}
         ${isGM() && Store.table && html`<label class="chk small"><input type="checkbox" checked=${!!c.freeEdit} onChange=${e => update(x => { x.freeEdit = e.target.checked; })} /> Player may use Free edit</label>`}
       </div>
@@ -632,7 +670,7 @@ function WeaponLines({ c, d }) {
   if (!ws.length) return html`<p class="muted">No weapon equipped. Unarmed attacks use Strength or Finesse and deal ${d.prof}d4 damage. Equip weapons on the Gear tab.</p>`;
   return html`<div class="wlines">${ws.map(w => { const W = R.weaponStats(w); if (!W) return null;
     const own = R.gearName(w, W) !== W.name;
-    return html`<div class="wline"><div class="wn"><${Icon} n="weapon" /><span class="wnm"><b>${R.gearName(w, W)}</b>${own && html`<small>${W.name}</small>`}</span><span class="tag">${w.slot === "primary" ? "Primary" : "Secondary"}</span></div>
+    return html`<div class="wline"><div class="wn"><${Icon} n="weapon" /><span class="wnm"><b>${R.gearName(w, W)}</b>${own && html`<small>${W.name}</small>`}</span><span class="tag">${w.slot === "primary" ? "Primary" : "Secondary"}</span><${Burden} W=${W} /></div>
       <${WeaponStats} W=${W} d=${d} />${W.feat && html`<${Md} cls="small" text=${W.feat} />`}</div>`; })}</div>`;
 }
 const COND = ["Hidden", "Restrained", "Vulnerable"];
@@ -730,8 +768,12 @@ function DiceDock({ c, update }) {
     if (d && exps.length > d.cur.hope) { toast(`Using ${exps.length} Experience${exps.length > 1 ? "s" : ""} costs ${exps.length} Hope; you have ${d.cur.hope}.`); return; }
     const own = ownRolls();
     if (own && (hand.h === "" || hand.f === "" || (adv && hand.a === ""))) { toast("Type what you rolled on each die."); return; }
+    const parts = [];   // what was added, so the result can show its working
+    if (d && trait) parts.push([R.TRAIT_NAME[trait], tmod]);
+    if (d) d.exps.filter(e => exps.includes(e.id)).forEach(e => parts.push([e.name || "Experience", e.mod]));
+    if (num(mod)) parts.push(["modifier", num(mod)]);
     const r = R.duality({ mod: tmod + emod + num(mod), adv, difficulty: diff, hope: own ? num(hand.h) : undefined, fear: own ? num(hand.f) : undefined, advDie: own ? num(hand.a) : undefined });
-    setRes(Object.assign(r, { k: Date.now() }));
+    setRes(Object.assign(r, { k: Date.now(), parts }));
     if (c && d) update(x => {
       let hope = num(x.marks.hope) - exps.length;
       if (!reaction && r.withHope) hope += 1;
@@ -757,9 +799,10 @@ function DiceDock({ c, update }) {
       ${adv !== 0 && html`<label class="field tiny"><span>d6</span><input type="number" min="1" max="6" value=${hand.a} onInput=${e => setHand(Object.assign({}, hand, { a: e.target.value }))} /></label>`}</div>`}
     <button class="btn primary wide" onClick=${go}>Roll${exps.length ? ` (spend ${exps.length} Hope)` : ""} · ${R.sign(tmod + emod + num(mod))}</button>
     ${res && html`<div key=${res.k} class=${"rollres " + (res.crit ? "crit" : res.withHope ? "hope" : "fear")}>
-      <div class="dice"><span class="die h">${res.h}</span><span class="die f">${res.f}</span>${res.adv ? html`<span class="die a">${res.adv > 0 ? "+" : "−"}${res.a}</span>` : ""}</div>
+      <div class="dice"><span class="die h">${res.h}</span><span class="die f">${res.f}</span>${res.adv ? html`<span class="die a" title=${res.adv > 0 ? "Advantage die (d6), added" : "Disadvantage die (d6), subtracted"}>${res.adv > 0 ? "+" : "−"}${res.a}</span>` : ""}</div>
       <b class="tot">${res.total}</b>
       <span>${res.crit ? "Critical success!" : res.withHope ? "with Hope" : "with Fear"}${res.success === true && !res.crit ? " · success" : res.success === false ? " · failure" : ""}</span>
+      <div class="working">${res.h} <i>Hope</i> + ${res.f} <i>Fear</i>${res.adv ? html` ${res.adv > 0 ? "+" : "−"} ${res.a} <i>${res.adv > 0 ? "advantage" : "disadvantage"} d6</i>` : ""}${(res.parts || []).map(([n, v]) => html` ${v < 0 ? "−" : "+"} ${Math.abs(v)} <i>${n}</i>`)} = <b>${res.total}</b>${res.success != null ? ` vs ${diff}` : ""}</div>
       <small>${reaction ? "Reaction rolls don't give Hope or Fear." : res.crit ? "You gain a Hope and clear a Stress." : res.withHope ? "You gain a Hope." : "The GM gains a Fear."}</small></div>`}
   </div>`;
 }
@@ -788,10 +831,19 @@ function AbilitiesTab({ c, d, update, edit }) {
   const com = R.byName("communities", c.community), tr = R.byName("transformations", c.transformation);
   const her = R.heritageFeatures(c);
   const subFeats = sub ? [["Foundation", sub.foundation, "foundation", "found"], ["Specialization", sub.specialization, "specialization", "spec"], ["Mastery", sub.mastery, "mastery", "mast"]].slice(0, d.subTier) : [];
-  const recall = (i, cardObj) => {
+  const recall = async (i, cardObj) => {
     const isVault = c.cards[i].where === "vault";
     if (isVault && d.loadout.length >= R.MAX.loadout) { toast("Your loadout is full (5). Move a card to the vault first."); return; }
-    if (isVault && cardObj && cardObj.recall > 0 && !confirm(`Recalling ${cardObj.name} now costs ${cardObj.recall} Stress (free during a rest). Mark ${cardObj.recall} Stress?`)) return;
+    if (isVault && cardObj && cardObj.recall > 0) {
+      const after = Math.min(d.stressMax, d.cur.stress + cardObj.recall), [col] = domLook(cardObj.dom);
+      const ok = await ask({ title: `Recall ${cardObj.name}`, icon: "recall", ok: `Mark ${cardObj.recall} Stress and recall`, body: html`
+        <p>Bringing a card back from the vault outside a rest costs its Recall Cost in Stress.</p>
+        <div class="rp-eq"><span class="eq-c eq-recall" style=${`border-color:${col}`}><b>${BOLT}${cardObj.recall}</b><small>${cardObj.dom} · Recall Cost</small></span><span class="eq-g"><span class="eq-op">=</span>
+          <span class="eq-c eq-stress"><b>${d.cur.stress} → ${after}</b><small>Stress of ${d.stressMax}</small></span></span></div>
+        ${after >= d.stressMax && html`<p class="warn">That marks your last Stress: you'll be Vulnerable until you clear one.</p>`}
+        <p class="muted small">Resting? Recall for free from the rest window instead.</p>` });
+      if (!ok) return;
+    }
     update(x => {
       x.cards[i].where = isVault ? "loadout" : "vault";
       if (isVault && cardObj && cardObj.recall > 0) x.marks.stress = Math.min(d.stressMax, num(x.marks.stress) + cardObj.recall);
@@ -874,7 +926,7 @@ function GearTitle({ g, S, icon, tags, onRename }) {
         onInput=${e => onRename(e.target.value)} onBlur=${() => setOn(false)} onKeyDown=${e => { if (e.key === "Enter" || e.key === "Escape") setOn(false); }} />`
       : html`<span class="wname"><b>${R.gearName(g, S)}</b><button class="iconbtn rn" aria-label=${`Rename ${base}`} title="Give it a name" onClick=${() => setOn(true)}><${Icon} n="quill" /></button></span>`}
       ${own && !on && html`<span class="wsub">${base}</span>`}</div>
-    ${tags}</div>`;
+    <span class="wtags">${tags}</span></div>`;
 }
 function GearTab({ c, d, update, edit }) {
   const [wpick, setWpick] = useState(null); const [apick, setApick] = useState(false); const [ipick, setIpick] = useState(null);
@@ -894,7 +946,7 @@ function GearTab({ c, d, update, edit }) {
       ${tierWarn && html`<p class="warn">You can't equip weapons or armor of a higher tier than yours (tier ${d.tier}).</p>`}
       <div class="wcards">${c.weapons.map((w, i) => { const W = R.weaponStats(w); return html`<div class=${"wcard" + (w.slot !== "pack" ? " eq" : "")}>
         <${GearTitle} g=${w} S=${W} icon="weapon" onRename=${v => update(x => { x.weapons[i].label = v; })}
-          tags=${html`${W && W.tier && html`<span class="tag">Tier ${W.tier}</span>`}${W && W.cat && html`<span class="tag">${W.cat}</span>`}`} />
+          tags=${html`${W && W.tier && html`<span class="tag">Tier ${W.tier}</span>`}${W && W.cat && html`<span class="tag">${W.cat}</span>`}<${Burden} W=${W} />`} />
         ${w.custom && edit ? html`<div class="grid4"><${Field} label="Name" value=${w.name} onInput=${v => update(x => { x.weapons[i].name = v; })} />
             <${Select} label="Trait" value=${w.trait} options=${R.TRAITS.map(t => t.n)} onChange=${v => update(x => { x.weapons[i].trait = v; })} />
             <${Select} label="Range" value=${w.range} options=${R.RANGES} onChange=${v => update(x => { x.weapons[i].range = v; })} />
@@ -989,10 +1041,10 @@ function DataTab({ c, update, onDelete }) {
   const [paste, setPaste] = useState("");
   const fileName = (c.name || "character").replace(/[^\w-]+/g, "_") + ".json";
   const exportBody = () => { const b = clean(c); ["id", "players", "_rev", "companionOf", "freeEdit"].forEach(k => delete b[k]); b.dh = 1; return JSON.stringify(b, null, 1); };
-  const apply = () => {
+  const apply = async () => {
+    let v; try { v = JSON.parse(paste); if (!v || !v.dh) throw 0; } catch { toast("That doesn't look like a saved character."); return; }
+    if (!(await ask({ title: "Replace this character?", icon: "book", danger: true, ok: "Replace", body: `${c.name || "This character"} will be replaced by ${v.name || "the pasted character"}. This can't be undone.` }))) return;
     try {
-      const v = JSON.parse(paste); if (!v || !v.dh) throw 0;
-      if (!confirm(`Replace ${c.name || "this character"} with ${v.name || "the pasted character"}?`)) return;
       update(x => { const keep = { id: x.id, players: x.players, companionOf: x.companionOf, freeEdit: x.freeEdit }; Object.keys(x).forEach(k => delete x[k]); Object.assign(x, R.normalize(v), keep); addLog(x, "Loaded from a saved file"); });
       setPaste(""); toast("Character loaded.");
     } catch { toast("That doesn't look like a saved character."); }
@@ -1007,7 +1059,7 @@ function DataTab({ c, update, onDelete }) {
     <section class="card"><${Head} title="Log" /><ul class="log">${c.log.map(l => html`<li><time>${new Date(l.t).toLocaleString()}</time> ${l.m}</li>`)}</ul>
       ${!c.log.length && html`<p class="muted">Changes show up here.</p>`}</section>
     <section class="card"><${Head} title="Delete" />
-      <button class="btn danger" onClick=${() => { if (confirm(`Delete ${c.name || "this character"} for good?`)) onDelete(c.id); }}>Delete this character</button></section>
+      <button class="btn danger" onClick=${async () => { if (await ask({ title: "Delete this character?", icon: "wound", danger: true, ok: "Delete for good", body: `${c.name || "This character"} will be deleted for everyone at the table. This can't be undone.` })) onDelete(c.id); }}>Delete this character</button></section>
   </div>`;
 }
 
@@ -1045,7 +1097,7 @@ function CompanionSheet({ c, master, update, onDelete }) {
         <div class="chips">${COMPANION_OPTS.map(o => html`<button class=${"chip" + (count(o) ? " on" : "")} ...${pressProps(() => set("options", k.options.concat(o)), () => { const i = k.options.indexOf(o); if (i >= 0) { const n = k.options.slice(); n.splice(i, 1); set("options", n); } }, { title: o, lines: ["Left-click: take it", "Right-click: remove one"] })}>${o}${count(o) > 1 ? ` ×${count(o)}` : ""}</button>`)}</div>
         ${lvl && html`<details><summary>What each option does</summary><${Md} text=${lvl.x} /></details>`}</section>
       <section class="card"><${Head} title="Notes" /><${AutoText} label="Notes" value=${c.notes} onInput=${v => update(x => { x.notes = v; })} />
-        <div class="row"><button class="btn danger small" onClick=${() => confirm(`Delete ${c.name}?`) && onDelete(c.id)}>Delete companion</button></div></section>
+        <div class="row"><button class="btn danger small" onClick=${async () => (await ask({ title: "Delete this companion?", icon: "wound", danger: true, ok: "Delete", body: `${c.name || "This companion"} will be deleted for good.` })) && onDelete(c.id)}>Delete companion</button></div></section>
     </div></section>`;
 }
 
@@ -1066,9 +1118,12 @@ function TraitShield({ t, value, marked, spell, onClick, armed, pick, children }
   // Name and verbs sit in the shield's broad top; the value sits in its point, like a heraldic charge.
   return html`<div class="trait-col"><div class=${"trait-wrap" + (marked ? " marked" : "") + (pick ? " pick" : "") + (armed ? " armed" : "") + (spell ? " spell" : "")}>
     <${T} class="trait" type=${onClick ? "button" : undefined} onClick=${onClick}>
-      ${spell && html`<span class="tspell" aria-label="Spellcast trait"><${Icon} n="spellcast" /></span>`}${marked && html`<span class="tmark" title="Marked this tier">◆</span>`}
+      ${marked && html`<span class="tmark" title="Marked this tier">◆</span>`}
       <span class="ti"><${Icon} n=${t.k} /></span><span class="tn">${t.n}</span><span class="tverbs">${t.v}</span>
-      <b class=${"tv" + (value != null && value < 0 ? " neg" : "")}>${value == null ? "?" : R.sign(value)}</b>
+      <span class=${"tvb" + (spell ? " spell" : "") + (value != null && value < 0 ? " neg" : "")}>
+        ${spell ? html`<span class="tspell" aria-label="Spellcast trait"><${Icon} n="spellcast" /></span>`
+          : html`<svg class="tbadge" viewBox="0 0 64 74" aria-hidden="true"><path class="o" d="M3 3H61V33C61 52 47 64 32 71C17 64 3 52 3 33Z" /><path class="i" d="M9 9H55V33C55 48 44 58 32 64C20 58 9 48 9 33Z" /></svg>`}
+        <b class="tv">${value == null ? "?" : R.sign(value)}</b></span>
     </${T}></div>${children && html`<div class="trait-under">${children}</div>`}</div>`;
 }
 
@@ -1084,15 +1139,23 @@ function ThresholdRuler({ major, severe, massive, hit }) {
     <div class="rl-hp"><span>mark 1 HP</span><span></span><span>mark 2 HP</span><span></span><span>mark 3 HP${massive ? ` · ${severe * 2}+: 4` : ""}</span></div></div>`;
 }
 
+// Trait, range and damage as cells; the damage type sits under the damage. Burden is shown as hands (Burden).
 function WeaponStats({ W, d }) {
   const t = R.TRAIT_KEY[(W.trait || "").toLowerCase()];
   const type = (/(phy\/mag|phy or mag|phy|mag)\s*$/.exec(W.dmg || "") || [])[1] || "";
-  return html`<div class="statcells">
+  return html`<div class="statcells three">
     <div class="cell"><small>Trait</small><b>${W.trait}${d && t != null ? ` ${R.sign(d.traits[t])}` : ""}</b></div>
     <div class="cell"><small>Range</small><b>${W.range}</b></div>
-    <div class="cell big"><small>Damage</small><b>${d ? R.damageExpr(W.dmg, d.prof) : W.dmg.replace(/\s*(phy\/mag|phy or mag|phy|mag)\s*$/, "")}</b></div>
-    <div class="cell"><small>Type</small><b>${type === "mag" ? "Magic" : type === "phy" ? "Physical" : type ? "Either" : "—"}</b></div>
-    <div class="cell"><small>Burden</small><b>${(W.burden || "").replace("-Handed", "-hand")}</b></div></div>`;
+    <div class=${"cell big dmg " + (type === "mag" ? "mag" : type === "phy" ? "phy" : "")}><small>Damage</small><b>${d ? R.damageExpr(W.dmg, d.prof) : W.dmg.replace(/\s*(phy\/mag|phy or mag|phy|mag)\s*$/, "")}</b>
+      <em>${type === "mag" ? "Magic" : type === "phy" ? "Physical" : type ? "Physical or magic" : ""}</em></div></div>`;
+}
+// One or two hands in the corner: faint until hovered, then they light and explain.
+function Burden({ W }) {
+  if (!W || !W.burden) return null;
+  const two = /two/i.test(W.burden);
+  return html`<span class=${"burden" + (two ? " two" : "")} aria-label=${two ? "Two-handed" : "One-handed"}
+    onMouseEnter=${e => tip.show(e.currentTarget, { title: two ? "Two-handed" : "One-handed", lines: [two ? "This weapon is a two-hander: it takes both hands, leaving none for a secondary weapon." : "This weapon takes one hand, leaving the other free for a secondary weapon or shield."] })}
+    onMouseLeave=${() => tip.hide()}><${Icon} n="hand" />${two && html`<${Icon} n="hand" cls="flip" />`}</span>`;
 }
 
 function featureCosts(text) {
@@ -1129,7 +1192,7 @@ function Catalog({ title, icon, items, render, per = 6, tools, empty = "Nothing 
 function ItemCard({ x, kind, on, onPick, disabled, why }) {
   const T = onPick ? "button" : "div";
   return html`<${T} class=${"item-card" + (on ? " on" : "")} disabled=${disabled} title=${why || ""} onClick=${onPick}>
-    <span class="in"><${Icon} n=${kind === "weapon" ? "weapon" : kind === "armor" ? "helm" : kind === "consumable" ? "potion" : "pack"} />${x.name}</span>
+    <span class="in"><${Icon} n=${kind === "weapon" ? "weapon" : kind === "armor" ? "helm" : kind === "consumable" ? "potion" : "pack"} />${x.name}${kind === "weapon" && html`<${Burden} W=${x} />`}</span>
     ${kind === "weapon" && html`<span class="small muted">${x.wheelchair ? "Combat wheelchair · " : ""}${x.cat} · Tier ${x.tier}</span><${WeaponStats} W=${x} />`}
     ${kind === "armor" && html`<div class="statcells"><div class="cell big"><small>Major</small><b>${x.major}</b></div><div class="cell big"><small>Severe</small><b>${x.severe}</b></div><div class="cell big"><small>Score</small><b>${x.score}</b></div><div class="cell"><small>Tier</small><b>${x.tier}</b></div></div>`}
     ${(x.feat || x.x) && html`<${Md} cls="small" text=${x.feat || x.x} />`}
