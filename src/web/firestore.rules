@@ -19,7 +19,8 @@ service cloud.firestore {
         allow update: if gm(t);
       }
       match /members/{uid} {
-        allow read: if member(t) && (uid == request.auth.uid || gm(t));
+        // Anyone signed in may look up their own membership (a new player must, before they're a member); GMs see everyone's.
+        allow get: if signedIn() && (uid == request.auth.uid || gm(t));
         allow list: if gm(t);
         // Joining: you add yourself as a player, or as GM only if you own the table.
         allow create: if signedIn() && uid == request.auth.uid && (request.resource.data.role == "player"

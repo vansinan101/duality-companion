@@ -43,4 +43,19 @@ eq(DH.usage("You can do this three times per rest").times, 3, "three times per r
 // card counts
 eq(DH.cardsIn("Blade").filter(x => x.lvl === 1).length, 3, "Blade has three level 1 cards");
 eq(SRD.classes.length, 13, "13 classes"); eq(SRD.cards.length, 210, "210 domain cards");
+// rulebooks: Core only hides Hope & Fear content
+DH.setBooks({ hf: false }); eq([DH.list("classes").length, DH.subclassesOf("Witch").length, DH.cardsIn("Dread").length], [9, 0, 0], "Core only: 9 classes, no Witch subclasses, no Dread cards");
+DH.setBooks({ hf: true }); eq([DH.list("classes").length, DH.cardsIn("Dread").length], [13, 21], "With Hope & Fear: 13 classes and the Dread domain");
+// renamed gear: the player's name wins, the item's stays for its type; older saves without a label still work
+const gn = DH.normalize({ weapons: [{ id: "w", name: "Broadsword", slot: "primary", label: "Oathkeeper" }, { id: "v", name: "Dagger", slot: "pack", label: 7 }] });
+eq([DH.gearName(gn.weapons[0], DH.weaponStats(gn.weapons[0])), DH.weaponStats(gn.weapons[0]).name, gn.weapons[1].label], ["Oathkeeper", "Broadsword", "7"], "renamed weapon keeps its type");
+eq(DH.gearName({ id: "a", name: "Leather Armor", label: "  " }, DH.armorStats({ name: "Leather Armor" })), "Leather Armor", "blank label falls back to the item name");
+// armor that scales: Mage Robes add the Spellcast trait to thresholds; Rune-Forged Exosuit adds the tier
+const mr = DH.blankCharacter(); mr.cls = "Wizard"; mr.sub = "School of Knowledge"; mr.traits.kno = 2; mr.armor = [{ id: "a", name: "Mage Robes", worn: true }]; d = DH.derived(mr);
+eq([d.major, d.severe], [7, 13], "Mage Robes 4/10 + level 1 + Knowledge 2 (Spellcast) = 7/13");
+mr.sub = ""; d = DH.derived(mr); eq([d.major, d.severe], [5, 11], "Mage Robes without a Spellcast trait: no bonus");
+const rf = DH.blankCharacter(); rf.cls = "Guardian"; rf.level = 8; rf.armor = [{ id: "a", name: "Rune-Forged Exosuit", worn: true }]; d = DH.derived(rf);
+eq([d.major, d.severe], [12 + 8 + 4, 39 + 8 + 4], "Rune-Forged Exosuit adds the tier (4)");
+const rl = DH.blankCharacter(); rl.traits.agi = 1; rl.items = [{ id: "i", name: "Stride Relic", kind: "item", worn: true }]; eq(DH.derived(rl).traits.agi, 2, "a worn Stride Relic adds +1 Agility");
+rl.items[0].worn = false; eq(DH.derived(rl).traits.agi, 1, "carried but not worn: no bonus");
 console.log(fails ? `${fails} FAILED` : "all passed"); process.exit(fails ? 1 : 0);

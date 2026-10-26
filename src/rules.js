@@ -39,12 +39,19 @@
   ];
   const ADV_BY = Object.fromEntries(ADV.map(a => [a.k, a]));
 
+  // ---- which rulebooks the table uses: the Core Set always; Hope & Fear expansion content (hf: 1) only if the GM says so ----
+  let BOOKS = { hf: false };
+  const setBooks = b => { BOOKS = Object.assign({ hf: false }, b || {}); };
+  const allowed = x => !!x && (!x.hf || BOOKS.hf);
+  const books = () => BOOKS;
+
   // ---- data lookups ----
   const byName = (list, n) => (S()[list] || []).find(x => x.name === n) || null;
   const cls = c => byName("classes", c.cls);
   const subcls = (name) => byName("subclasses", name);
-  const subclassesOf = clsName => (S().subclasses || []).filter(s => s.cls === clsName);
-  const cardsIn = dom => (S().cards || []).filter(x => x.dom === dom).sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
+  const subclassesOf = clsName => (S().subclasses || []).filter(s => s.cls === clsName && allowed(s));
+  const cardsIn = dom => (S().cards || []).filter(x => x.dom === dom && allowed(x)).sort((a, b) => a.lvl - b.lvl || a.name.localeCompare(b.name));
+  const list = kind => (S()[kind] || []).filter(allowed);
   const card = n => byName("cards", n);
   const weapon = n => byName("weapons", n);
   const armorItem = n => byName("armor", n);
@@ -64,8 +71,8 @@
       marks: { hp: 0, stress: 0, hope: 2, armor: {} },   // armor: { armorId: slots marked }
       scars: 0,
       cards: [],                         // [{ name, where: "loadout" | "vault" }]
-      weapons: [],                       // [{ id, name, custom?, slot: "primary" | "secondary" | "pack" }]
-      armor: [],                         // [{ id, name, custom?, worn }]
+      weapons: [],                       // [{ id, name, label?, custom?, slot: "primary" | "secondary" | "pack" }]; label = the player's own name for it
+      armor: [],                         // [{ id, name, label?, custom?, worn }]
       items: [],                         // [{ id, name, qty, kind: "item" | "consumable", text }]
       gold: { coins: 0, handfuls: 1, bags: 0, chests: 0 },
       conditions: [],
@@ -92,6 +99,7 @@
     c.gold = Object.assign({}, b.gold, c.gold);
     ["experiences", "levelups", "cards", "weapons", "armor", "items", "conditions", "log"].forEach(k => { if (!Array.isArray(c[k])) c[k] = []; });
     ["uses", "tokens", "answers"].forEach(k => { if (!c[k] || typeof c[k] !== "object") c[k] = {}; });
+    c.weapons.concat(c.armor).forEach(g => { if (g && g.label != null && typeof g.label !== "string") g.label = String(g.label); });
     c.level = clamp(num(c.level, 1), 1, 10);
     c.experiences = c.experiences.map((e, i) => Object.assign({ id: "e" + i, name: "", base: 2 }, e));
     return c;
@@ -150,6 +158,8 @@
   const worn = c => (c.armor || []).find(a => a.worn) || null;
   const armorStats = a => (!a ? null : a.custom ? { name: a.name || "Armor", major: num(a.major), severe: num(a.severe), score: num(a.score), feat: a.feat || "" } : armorItem(a.name));
   const weaponStats = w => (!w ? null : w.custom ? { name: w.name || "Weapon", trait: w.trait || "Strength", range: w.range || "Melee", dmg: w.dmg || "d6 phy", burden: w.burden || "One-Handed", cat: w.slot === "secondary" ? "Secondary" : "Primary", feat: w.feat || "", tier: num(w.tier, 1) } : weapon(w.name));
+  // What to call a weapon or armor: the player's own name if they gave one, else the item's.
+  const gearName = (g, S) => (g && typeof g.label === "string" && g.label.trim()) || (S && S.name) || (g && g.name) || "";
   const equipped = c => (c.weapons || []).filter(w => w.slot === "primary" || w.slot === "secondary");
 
   // ---- the derived sheet ----
@@ -160,6 +170,12 @@
     const a = worn(c), A = armorStats(a);
     if (A) featureMods(A.feat).forEach(m => mods.push(Object.assign(m, { from: A.name })));
     equipped(c).forEach(w => { const W = weaponStats(w); if (W) featureMods(W.feat).forEach(m => mods.push(Object.assign(m, { from: W.name }))); });
+    // Worn items that always apply (SRD relics: "You gain a +1 bonus to your Agility."). Conditional items are left to the player.
+    (c.items || []).filter(it => it.worn && it.kind !== "consumable").forEach(it => {
+      const t = String(it.text || (byName("items", it.name) || {}).x || "").replace(/\*/g, "");
+      const m = /^You gain a ([+−-]?\d+) bonus to your (Agility|Strength|Finesse|Instinct|Presence|Knowledge|Evasion)\b/i.exec(t);
+      if (m) mods.push({ v: +m[1].replace("−", "-"), to: m[2].toLowerCase(), from: it.name });
+    });
     const profNow = proficiency(c);
     heritageFeatures(c).forEach(h => (HERITAGE_MODS[h.f.n] || []).forEach(m => mods.push({ v: m.v === "prof" ? profNow : m.v, to: m.to, from: `${h.f.n} (${h.a})` })));
     const modSum = to => mods.filter(m => m.to === to).reduce((s, m) => s + m.v, 0);
@@ -174,6 +190,13 @@
     const hopeMax = clamp(MAX.hope - num(c.scars) + num(c.bonus.hope), 0, 8);
     const evasion = (K ? K.evasion : 10) + (n.evasion || 0) + num(c.bonus.evasion) + modSum("evasion");
     const armorScore = clamp((A ? A.score : 0) + num(c.bonus.armor) + modSum("armor score"), 0, MAX.armor);
+    // spellcasting (needed here: some armor adds the Spellcast trait to thresholds)
+    const sub = subcls(c.sub), msub = c.multi && c.multi.sub ? subcls(c.multi.sub) : null;
+    const spellTraits = [sub && sub.spell, msub && msub.spell].filter(Boolean).map(x => TRAIT_KEY[x.toLowerCase()]).filter(Boolean);
+    // Armor features that scale (SRD: Mage Robes "Enchanted", Rune-Forged Exosuit "Attuned").
+    // APP READING: with no Spellcast trait, or a negative one, the bonus is 0.
+    if (A && /damage thresholds equal to your Spellcast trait/i.test(A.feat || "")) mods.push({ v: Math.max(0, ...spellTraits.map(k => traits[k])), to: "damage thresholds", from: A.name });
+    if (A && /damage thresholds equal to your tier/i.test(A.feat || "")) mods.push({ v: tier, to: "damage thresholds", from: A.name });
     const thrB = modSum("damage thresholds");
     const major = (A ? A.major + c.level : c.level) + num(c.bonus.major) + thrB + modSum("major damage threshold");
     const severe = (A ? A.severe + c.level : c.level * 2) + num(c.bonus.severe) + thrB + modSum("severe damage threshold");
@@ -181,9 +204,6 @@
     // experiences
     const eb = expBonus(c);
     const exps = c.experiences.map(e => ({ id: e.id, name: e.name, mod: num(e.base, 2) + (eb[e.id] || 0) }));
-    // spellcasting
-    const sub = subcls(c.sub), msub = c.multi && c.multi.sub ? subcls(c.multi.sub) : null;
-    const spellTraits = [sub && sub.spell, msub && msub.spell].filter(Boolean).map(x => TRAIT_KEY[x.toLowerCase()]).filter(Boolean);
     const domains = K ? K.domains.slice() : [];
     if (c.multi && c.multi.domain && !domains.includes(c.multi.domain)) domains.push(c.multi.domain);
     const loadout = c.cards.filter(x => x.where !== "vault"), vault = c.cards.filter(x => x.where === "vault");
@@ -193,6 +213,7 @@
     };
     return {
       tier, prof, traits, traitAdv, mods, evasion, armorScore, major, severe, hpMax, stressMax, hopeMax, exps, cur,
+      worn: (c.items || []).filter(it => it.worn && it.kind !== "consumable"),
       cls: K, sub, msub, subTier: subclassTier(c), spellTraits, domains, loadout, vault, armor: a, armorStats: A,
       vulnerable: cur.stress >= stressMax, down: cur.hp >= hpMax, adv: { n, byTier }, marked: markedTraits(c),
       cardCount: c.cards.length, cardsExpected: 2 + (c.level - 1) + (n.card || 0),
@@ -335,10 +356,11 @@
 
   const api = {
     TRAITS, TRAIT_KEY, TRAIT_NAME, START_TRAITS, MAX, RANGES, ADV, ADV_BY, SHORT_MOVES, LONG_MOVES,
+    setBooks, allowed, books, list,
     tierOf, clamp, num, sign, blankCharacter, heritageFeatures, HERITAGE_MODS, normalize, derived, advCounts, markedTraits, subclassTier, proficiency,
     featureMods, severity, duality, roll, die, damageExpr, usage, refreshUses, goldTotal, goldFrom,
     availableCards, advancementOptions, levelUp, undoLevelUp,
-    cls, subcls, subclassesOf, cardsIn, card, weapon, armorItem, armorStats, weaponStats, worn, equipped, byName,
+    cls, subcls, subclassesOf, cardsIn, card, weapon, armorItem, armorStats, weaponStats, gearName, worn, equipped, byName,
   };
   root.DH = api;
   if (typeof module !== "undefined") module.exports = api;

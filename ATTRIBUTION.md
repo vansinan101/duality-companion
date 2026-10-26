@@ -8,6 +8,8 @@ Darrington Press™ and the Darrington Press authorized work logo are trademarks
 
 Daggerheart™ Compatible. Terms at Daggerheart.com
 
+Icons from [game-icons.net](https://game-icons.net) by Lorc, Delapouite, Caro Asercion, DarkZaitzev, Sbed and Skoll, licensed [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/). The Hope gem and recall bolt icons and the ornaments are drawn for this app.
+
 ---
 
 ## How this project uses the licence (read before publishing)

@@ -14,7 +14,7 @@ def rd(*p):
     with open(os.path.join(HERE, *p), encoding="utf-8") as f: return f.read()
 def script(src): return "<script>\n" + src.replace("</script", "<\\/script") + "\n</script>\n"
 
-APP_SCRIPTS = ["config.js", "srd-data.js", "rules.js", "rules-info.js", "app.js", "levelup.js", "genesis.js", "gm.js"]
+APP_SCRIPTS = ["config.js", "icons.js", "srd-data.js", "rules.js", "rules-info.js", "app.js", "levelup.js", "genesis.js", "gm.js"]
 VENDOR = ["vendor/preact.umd.js", "vendor/hooks.umd.js", "vendor/htm.umd.js"]
 FIREBASE = "11.10.0"
 
